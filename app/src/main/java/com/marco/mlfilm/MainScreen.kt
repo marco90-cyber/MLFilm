@@ -258,7 +258,10 @@ fun CameraScreen(onAlbum: () -> Unit) {
                         Modifier.align(Alignment.TopStart).padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Chip("FLIP", front) { front = !front }
+                        Chip("FLIP", front) {
+                            front = !front
+                            if (front) flashIdx = 0
+                        }
                         if (!front && flashOk) {
                             Chip("FLASH " + FLASH_MODES[flashIdx].first, flashIdx != 0) {
                                 flashIdx = (flashIdx + 1) % FLASH_MODES.size

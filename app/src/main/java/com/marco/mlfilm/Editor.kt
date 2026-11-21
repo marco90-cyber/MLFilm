@@ -79,14 +79,22 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     var ci by remember { mutableIntStateOf(prefs.cam.coerceIn(0, CAMERAS.size - 1)) }
     var li by remember { mutableIntStateOf(prefs.lens.coerceIn(0, LENSES.size - 1)) }
     var fi by remember { mutableIntStateOf(prefs.film.coerceIn(0, FILMS.size - 1)) }
-    var date by remember { mutableStateOf(prefs.date) }
+    val hasNeg = remember(uri) {
+        displayName(ctx, uri)?.let { CameraController.negativeFile(ctx, it) } != null
+    }
+    var date by remember { mutableStateOf(hasNeg && prefs.date) }
     var open by remember { mutableIntStateOf(-1) }
     var saving by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    val look = remember(ci, li, fi) { buildLook(CAMERAS[ci], LENSES[li], FILMS[fi]) }
     val src by produceState<Bitmap?>(null, uri) {
         value = withContext(Dispatchers.IO) { loadSource(ctx, uri, 1280) }
+    }
+    // Senza negativo la foto è già sviluppata: si tiene il suo formato, senza ritagliarla di nuovo.
+    val look = run {
+        val s = src
+        val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
+        if (hasNeg || s == null) l else l.copy(aspect = s.width.toFloat() / s.height)
     }
 
     LaunchedEffect(src, look) {
@@ -109,8 +117,9 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) {
                             val full = loadSource(ctx, uri, 4096) ?: return@withContext false
+                            val fullLook = if (hasNeg) look else look.copy(aspect = full.width.toFloat() / full.height)
                             val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-                                proc.process(full, look, 4096) { cont.resume(it) }
+                                proc.process(full, fullLook, 4096) { cont.resume(it) }
                             }
                             full.recycle()
                             if (out == null) return@withContext false
@@ -148,7 +157,8 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                 else -> GearGrid("FILM", FILMS.size, fi, 4, { fi = it }, { FILMS[it].name }, panel) { i, m -> FilmGlyph(FILMS[i].family, m) }
             }
         } else {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (!hasNeg) Mono("SENZA NEGATIVO · L'EFFETTO SI SOMMA", color = C.Dim, size = 9.sp)
                 Chip("DATE", date) { date = !date }
             }
         }
