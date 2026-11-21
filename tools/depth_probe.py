@@ -18,7 +18,10 @@ for tag, x in (("raw01", a), ("imagenet", (a - mean) / std)):
     it.invoke()
     d = it.get_tensor(out[0]['index']).astype(np.float32)
     print(tag, "out shape", d.shape, "min", d.min(), "max", d.max(), "mean", d.mean())
-    d = d.reshape(d.shape[-2], d.shape[-1]) if d.ndim >= 2 else d
+    d = np.squeeze(d)
     n = (d - d.min()) / max(d.max() - d.min(), 1e-6)
     Image.fromarray((n * 255).astype(np.uint8)).save(f"{outdir}/depth_{tag}.png")
+    g = n.reshape(12, n.shape[0] // 12, 12, n.shape[1] // 12).mean(axis=(1, 3))
+    print("GRID", tag)
+    for row in g: print("GRID " + " ".join(str(int(v * 9.99)) for v in row))
 im.save(f"{outdir}/input.png")
