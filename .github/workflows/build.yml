@@ -29,6 +29,12 @@ jobs:
         with:
           gradle-version: 8.10.2
 
+      - name: Scarica il modello di profondita (Depth Anything V2 Small, TFLite)
+        run: |
+          mkdir -p app/src/main/assets/depth
+          curl -fL --retry 3 -o app/src/main/assets/depth/dav2s.tflite https://huggingface.co/qualcomm/Depth-Anything-V2/resolve/1dfdee5dd136dda59b8a2d34a8e09615472175d5/Depth-Anything-V2.tflite
+          echo "eb40cb5ec04987a1af4979c4457e535082a8700a786df51e3b632a7d6ac50fee  app/src/main/assets/depth/dav2s.tflite" | sha256sum -c -
+
       - name: Prepara la chiave di firma (dai Secrets)
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}

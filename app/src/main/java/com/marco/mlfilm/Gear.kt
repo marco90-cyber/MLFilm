@@ -28,11 +28,15 @@ data class CameraSpec(
     val half: Boolean = false,
 )
 
-/** Obiettivo: ingrandimento (lunghezza focale), nitidezza, distorsione, bagliore. */
+/** Obiettivo: lunghezza focale, apertura di default e forma del bokeh (la sfocatura usa la profondità). */
 data class LensSpec(
     val id: String,
     val name: String,
     val zoom: Float,
+    val f: Float = 2f,          // apertura di partenza; 0 = senza sfocatura di profondità
+    val shape: Int = 0,         // forma del bokeh: indice in SHAPES
+    val swirl: Float = 0f,      // bokeh "a vortice" ai bordi
+    val cat: Float = 0f,        // bokeh a occhio di gatto ai bordi
     val soft: Float = 0f,
     val vig: Float = 0f,
     val ca: Float = 0f,
@@ -40,6 +44,23 @@ data class LensSpec(
     val bloom: Float = 0f,
     val tilt: Float = 0f,
 )
+
+val SHAPES = listOf("CERCHIO", "ESAGONO", "PENTAGONO", "CUORE", "STELLA")
+
+/** Stop di diaframma offerti dall'editor; l'ultimo (0) spegne la sfocatura. */
+val APERTURES = floatArrayOf(1.4f, 1.8f, 2f, 2.8f, 4f, 5.6f, 8f, 11f, 16f, 0f)
+
+fun apertureLabel(f: Float) = if (f <= 0f) "OFF" else "F" + (if (f % 1f == 0f) f.toInt().toString() else f.toString())
+
+fun nearestAperture(f: Float): Int {
+    if (f <= 0f) return APERTURES.size - 1
+    var best = 0
+    for (i in 0 until APERTURES.size - 1) if (Math.abs(APERTURES[i] - f) < Math.abs(APERTURES[best] - f)) best = i
+    return best
+}
+
+/** Raggio massimo della sfocatura (frazione dell'altezza) per un'apertura. */
+fun blurRadius(f: Float) = if (f <= 0f) 0f else (0.05f * 2.8f / f).coerceIn(0f, 0.07f)
 
 /** Pellicola: un look colore (LUT 3D negli asset) più grana e alone propri della famiglia. */
 data class FilmSpec(
@@ -86,6 +107,13 @@ data class Look(
     val half: Boolean = false,
     val mirror: Boolean = false,
     val lut: String? = null,
+    val fNum: Float = 0f,        // 0 = niente sfocatura di profondità
+    val shape: Int = 0,
+    val swirl: Float = 0f,
+    val cat: Float = 0f,
+    val focusDepth: Float = 1f,  // profondità a fuoco (0 lontano .. 1 vicino)
+    val fpU: Float = 0.5f,       // punto a fuoco nel fotogramma (origine in alto a sinistra)
+    val fpV: Float = 0.5f,
 )
 
 fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(
@@ -97,6 +125,10 @@ fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(
     fade = cam.fade,
     grain = film.grain * cam.grainMul,
     lut = film.lut,
+    fNum = lens.f,
+    shape = lens.shape,
+    swirl = lens.swirl,
+    cat = lens.cat,
     halation = film.halation + lens.bloom,
     soft = cam.soft + lens.soft,
     vig = cam.vig + lens.vig,
@@ -144,19 +176,19 @@ val CAMERAS: List<CameraSpec> = listOf(
 // ---------------------------------------------------------------- 15 obiettivi
 
 val LENSES: List<LensSpec> = listOf(
-    LensSpec("24", "24mm f2.8", 1.0f, ca = 0.002f, vig = 0.08f),
-    LensSpec("28", "28mm f2.8", 1.06f, vig = 0.05f),
-    LensSpec("35", "35mm f2", 1.22f, vig = 0.06f),
-    LensSpec("40", "40mm f2.8", 1.38f),
-    LensSpec("50a", "50mm f1.4", 1.7f, soft = 0.1f, vig = 0.12f, bloom = 0.1f),
-    LensSpec("50b", "50mm f1.8", 1.7f, vig = 0.07f),
-    LensSpec("85", "85mm f1.8", 2.4f, soft = 0.08f, vig = 0.1f, bloom = 0.08f),
-    LensSpec("135", "135mm f2.8", 3.2f, vig = 0.06f),
-    LensSpec("zoom", "35-70mm", 1.5f, ca = 0.003f, vig = 0.1f),
-    LensSpec("fish", "Fisheye 16mm", 1.28f, dist = 0.95f, ca = 0.004f, vig = 0.15f),
-    LensSpec("tilt", "Tilt-Shift", 1.35f, tilt = 1f),
-    LensSpec("soft", "Soft Focus", 1.3f, soft = 0.75f, bloom = 0.45f),
-    LensSpec("vintage", "Vintage Glass", 1.4f, soft = 0.3f, vig = 0.2f, ca = 0.005f, bloom = 0.25f),
-    LensSpec("cine", "Cine 40mm", 1.4f, vig = 0.15f, ca = 0.004f, bloom = 0.3f),
-    LensSpec("lomo", "Lomo 32mm", 1.15f, vig = 0.45f, ca = 0.003f, dist = 0.08f),
+    LensSpec("24", "24mm f4", 1.0f, f = 4f, ca = 0.002f, vig = 0.08f),
+    LensSpec("35", "35mm f2", 1.22f, f = 2f, vig = 0.06f),
+    LensSpec("50a", "50mm f1.4", 1.7f, f = 1.4f, vig = 0.12f, bloom = 0.1f),
+    LensSpec("50b", "50mm f1.8 esagono", 1.7f, f = 1.8f, shape = 1, vig = 0.07f),
+    LensSpec("85a", "85mm f1.4", 2.4f, f = 1.4f, vig = 0.1f, bloom = 0.08f),
+    LensSpec("85b", "85mm f1.8 penta", 2.4f, f = 1.8f, shape = 2, vig = 0.08f),
+    LensSpec("135", "135mm f2", 3.2f, f = 2f, vig = 0.06f),
+    LensSpec("swirl", "Swirl 58 f1.4", 1.8f, f = 1.4f, swirl = 1f, vig = 0.2f, ca = 0.003f),
+    LensSpec("heart", "Cuore 50 f2", 1.7f, f = 2f, shape = 3, vig = 0.08f),
+    LensSpec("star", "Stella 50 f2", 1.7f, f = 2f, shape = 4, vig = 0.08f),
+    LensSpec("cat", "Occhio di gatto f1.2", 1.7f, f = 1.2f, cat = 1f, vig = 0.25f, bloom = 0.1f),
+    LensSpec("soft", "Soft 90 f2.8", 2.5f, f = 2.8f, soft = 0.7f, bloom = 0.45f),
+    LensSpec("cine", "Cine 40 f2", 1.4f, f = 2f, vig = 0.15f, ca = 0.004f, bloom = 0.3f),
+    LensSpec("fish", "Fisheye 16 f8", 1.28f, f = 8f, dist = 0.95f, ca = 0.004f, vig = 0.15f),
+    LensSpec("tilt", "Tilt-Shift f5.6", 1.35f, f = 5.6f, tilt = 1f),
 )

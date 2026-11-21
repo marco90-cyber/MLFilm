@@ -9,6 +9,14 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,6 +94,19 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     var open by remember { mutableIntStateOf(-1) }
     var saving by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<ImageBitmap?>(null) }
+    var ap by remember { mutableIntStateOf(nearestAperture(LENSES[li].f)) }
+    var sh by remember { mutableIntStateOf(LENSES[li].shape) }
+    LaunchedEffect(li) {
+        ap = nearestAperture(LENSES[li].f)
+        sh = LENSES[li].shape
+    }
+    var fd by remember { mutableStateOf(1f) }
+    var fp by remember { mutableStateOf(0.5f to 0.5f) }
+    var depth by remember { mutableStateOf<Bitmap?>(null) }
+    var depthVer by remember { mutableIntStateOf(0) }
+    var depthStatus by remember { mutableStateOf("CALCOLO...") }
+    var showBokeh by remember { mutableStateOf(false) }
+    var mode by remember { mutableIntStateOf(0) } // 0 fuoco, 1 pennello nitido, 2 pennello sfocato
 
     val src by produceState<Bitmap?>(null, uri) {
         value = withContext(Dispatchers.IO) { loadSource(ctx, uri, 1280) }
@@ -93,15 +114,48 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     // Senza negativo la foto è già sviluppata: si tiene il suo formato, senza ritagliarla di nuovo.
     val look = run {
         val s = src
-        val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
+        val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi]).copy(
+            fNum = APERTURES[ap], shape = sh, focusDepth = fd, fpU = fp.first, fpV = fp.second,
+        )
         if (hasNeg || s == null) l else l.copy(aspect = s.width.toFloat() / s.height)
     }
+    val srcAspect = src?.let { it.width.toFloat() / it.height } ?: 1f
 
-    LaunchedEffect(src, look) {
+    // mappa di profondità: salvata col negativo, altrimenti calcolata ora
+    LaunchedEffect(src) {
+        val s = src ?: return@LaunchedEffect
+        val name = displayName(ctx, uri)
+        val d = withContext(Dispatchers.Default) {
+            name?.let { DepthStore.load(ctx, it) }
+                ?: DepthEstimator.estimate(s)?.also { b -> name?.let { n -> DepthStore.save(ctx, n, DepthStore.toPng(b)) } }
+        }
+        depthStatus = if (d != null) "AI" else "STIMATA"
+        depth = d?.copy(Bitmap.Config.ARGB_8888, true)
+        if (d != null) fd = DepthStore.focusDepth(d, look, srcAspect, 0.5f, 0.5f)
+        depthVer++
+    }
+
+    fun paint(u: Float, v: Float) {
+        val d = depth ?: return
+        val (sx, sy) = DepthStore.toSource(u, v, look, srcAspect)
+        val cx = sx * d.width
+        val cy = sy * d.height
+        val r = 0.07f * d.width / look.zoom
+        val g = if (mode == 1) (fd * 255).toInt().coerceIn(0, 255) else if (fd > 0.5f) 0 else 255
+        val c1 = android.graphics.Color.argb(255, g, g, g)
+        val c0 = android.graphics.Color.argb(0, g, g, g)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            shader = android.graphics.RadialGradient(cx, cy, r, intArrayOf(c1, c1, c0), floatArrayOf(0f, 0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        }
+        android.graphics.Canvas(d).drawCircle(cx, cy, r, p)
+        depthVer++
+    }
+
+    LaunchedEffect(src, look, depthVer) {
         val s = src ?: return@LaunchedEffect
         delay(120)
         val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-            proc.process(s, look, 1280) { cont.resume(it) }
+            proc.process(s, look, 1280, if (look.fNum > 0f) depth else null) { cont.resume(it) }
         }
         if (out != null) preview = out.asImageBitmap()
     }
@@ -118,8 +172,9 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                         val ok = withContext(Dispatchers.IO) {
                             val full = loadSource(ctx, uri, 4096) ?: return@withContext false
                             val fullLook = if (hasNeg) look else look.copy(aspect = full.width.toFloat() / full.height)
+                            val dp = depth
                             val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-                                proc.process(full, fullLook, 4096) { cont.resume(it) }
+                                proc.process(full, fullLook, 4096, if (fullLook.fNum > 0f) dp else null) { cont.resume(it) }
                             }
                             full.recycle()
                             if (out == null) return@withContext false
@@ -130,6 +185,7 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                                 val oldName = displayName(ctx, uri)
                                 val neg = oldName?.let { CameraController.negativeFile(ctx, it) }
                                 if (neg != null) CameraController.saveNegative(ctx, name, neg.readBytes())
+                                dp?.let { DepthStore.save(ctx, name, DepthStore.toPng(it)) }
                             }
                             name != null
                         }
@@ -140,8 +196,35 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            preview?.let { Image(it, null, Modifier.fillMaxSize().padding(horizontal = 12.dp), contentScale = ContentScale.Fit) }
-                ?: Mono("CARICO...", size = 12.sp)
+            preview?.let { pv ->
+                Image(
+                    pv, null,
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp).pointerInput(showBokeh, mode, depth != null, look) {
+                        if (!showBokeh) return@pointerInput
+                        fun toUv(o: Offset): Pair<Float, Float>? {
+                            val sc = minOf(size.width / pv.width.toFloat(), size.height / pv.height.toFloat())
+                            val dw = pv.width * sc
+                            val dh = pv.height * sc
+                            val u = (o.x - (size.width - dw) / 2f) / dw
+                            val v = (o.y - (size.height - dh) / 2f) / dh
+                            return if (u in 0f..1f && v in 0f..1f) u to v else null
+                        }
+                        if (mode == 0) {
+                            detectTapGestures { o ->
+                                val uv = toUv(o) ?: return@detectTapGestures
+                                fp = uv
+                                depth?.let { fd = DepthStore.focusDepth(it, look, srcAspect, uv.first, uv.second) }
+                            }
+                        } else {
+                            detectDragGestures(
+                                onDragStart = { o -> toUv(o)?.let { paint(it.first, it.second) } },
+                                onDrag = { ch, _ -> toUv(ch.position)?.let { paint(it.first, it.second) } },
+                            )
+                        }
+                    },
+                    contentScale = ContentScale.Fit,
+                )
+            } ?: Mono("CARICO...", size = 12.sp)
         }
         ClapperStripe(Modifier.padding(horizontal = 12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel)) {
@@ -159,7 +242,30 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
         } else {
             Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (!hasNeg) Mono("SENZA NEGATIVO · L'EFFETTO SI SOMMA", color = C.Dim, size = 9.sp)
-                Chip("DATE", date) { date = !date }
+                if (showBokeh) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Mono(apertureLabel(APERTURES[ap]), color = C.Amber, size = 12.sp, modifier = Modifier.padding(end = 8.dp))
+                        Slider(
+                            value = ap.toFloat(), onValueChange = { ap = Math.round(it).coerceIn(0, APERTURES.size - 1) },
+                            valueRange = 0f..(APERTURES.size - 1).toFloat(), steps = APERTURES.size - 2,
+                            colors = SliderDefaults.colors(thumbColor = C.Amber, activeTrackColor = C.Amber, inactiveTrackColor = C.Line, activeTickColor = C.Amber, inactiveTickColor = C.Line),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SHAPES.forEachIndexed { i, n -> Chip(n, sh == i) { sh = i } }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Chip("FUOCO", mode == 0) { mode = 0 }
+                        Chip("NITIDO", mode == 1) { mode = 1 }
+                        Chip("SFOCA", mode == 2) { mode = 2 }
+                        Mono("PROFONDITÀ: $depthStatus", color = C.Dim, size = 9.sp, modifier = Modifier.weight(1f))
+                    }
+                }
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("BOKEH", showBokeh) { showBokeh = !showBokeh }
+                    Chip("DATE", date) { date = !date }
+                }
             }
         }
     }

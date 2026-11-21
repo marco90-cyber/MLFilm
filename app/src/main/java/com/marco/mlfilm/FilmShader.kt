@@ -45,11 +45,110 @@ uniform float uMirror;
 uniform vec2 uLeakPos;
 uniform sampler2D uLut;
 uniform float uLutOn;
+uniform sampler2D uDepth;
+uniform float uDepthOn;
+uniform float uBokeh;
+uniform float uFocusD;
+uniform vec2 uFocusPt;
+uniform float uShape;
+uniform float uSwirl;
+uniform float uCat;
+uniform float uBoost;
+uniform float uTaps;
+
+float hash12(vec2 p);
+
+vec2 srcUv(vec2 c) {
+    vec2 b = vec2(c.x * uRot.x - c.y * uRot.y, c.x * uRot.y + c.y * uRot.x) + 0.5;
+    return (uStM * vec4(b, 0.0, 1.0)).xy;
+}
 
 vec3 fetchC(vec2 c) {
-    vec2 b = vec2(c.x * uRot.x - c.y * uRot.y, c.x * uRot.y + c.y * uRot.x) + 0.5;
-    vec4 t = uStM * vec4(b, 0.0, 1.0);
-    return texture2D(uTex, t.xy).rgb;
+    return texture2D(uTex, srcUv(c)).rgb;
+}
+
+// da coordinate del fotogramma finale a coordinate centrate della sorgente (ritaglio, specchio, zoom, distorsione)
+vec2 toC(vec2 uv) {
+    vec2 c = uv - 0.5;
+    if (uOutAspect < uSrcAspect) {
+        c.x *= uOutAspect / uSrcAspect;
+    } else {
+        c.y *= uSrcAspect / uOutAspect;
+    }
+    if (uMirror > 0.5) c.x = -c.x;
+    c /= uZoom;
+    vec2 d = vec2(c.x * uSrcAspect, c.y);
+    return c * (1.0 + uDist * dot(d, d));
+}
+
+// profondità: 1 = vicino, 0 = lontano. Senza mappa si usa un gradiente attorno al punto a fuoco.
+float depthAt(vec2 c, vec2 uv) {
+    if (uDepthOn > 0.5) return texture2D(uDepth, srcUv(c)).r;
+    return 1.0 - clamp(length((uv - uFocusPt) * vec2(uOutAspect, 1.0)) * 1.8, 0.0, 1.0);
+}
+
+float shapeR(float a) {
+    if (uShape < 0.5) return 1.0;
+    if (uShape < 1.5) {
+        float k = 3.14159265 / 6.0;
+        return cos(k) / cos(mod(a, 2.0 * k) - k);
+    }
+    if (uShape < 2.5) {
+        float k = 3.14159265 / 5.0;
+        return cos(k) / cos(mod(a, 2.0 * k) - k);
+    }
+    if (uShape < 3.5) {
+        float t = a - 1.5707963;
+        float s = sin(t);
+        float r = 2.0 - 2.0 * s + s * sqrt(abs(cos(t))) / (s + 1.4);
+        return clamp(r / 3.0, 0.2, 1.15);
+    }
+    return 0.5 + 0.5 * cos(5.0 * a);
+}
+
+vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
+    float d0 = depthAt(c0, uv);
+    float coc0 = uBokeh * clamp(abs(d0 - uFocusD) * 1.7, 0.0, 1.0);
+    vec3 acc = col0;
+    float wsum = 1.0;
+    float jit = hash12(gl_FragCoord.xy + vec2(uSeed));
+    vec2 toCen = uv - 0.5;
+    float cl = length(toCen);
+    vec2 dir = cl > 0.0001 ? toCen / cl : vec2(1.0, 0.0);
+    for (int i = 0; i < 48; i++) {
+        if (float(i) >= uTaps) break;
+        float fi = float(i) + jit;
+        float r = sqrt((fi + 0.5) / uTaps);
+        float a = fi * 2.39996323;
+        float sr = shapeR(a);
+        vec2 p = r * sr * vec2(cos(a), sin(a));
+        if (uSwirl > 0.0) {
+            float ang = uSwirl * cl * 2.2;
+            p = vec2(p.x * cos(ang) - p.y * sin(ang), p.x * sin(ang) + p.y * cos(ang));
+            p -= dir * dot(p, dir) * (0.35 * clamp(cl * 1.6, 0.0, 1.0));
+        }
+        if (uCat > 0.0) {
+            p -= dir * dot(p, dir) * (uCat * clamp(cl * 1.5, 0.0, 0.75));
+        }
+        float dist = r * uBokeh;
+        vec2 suv = uv + p * uBokeh * vec2(1.0 / uOutAspect, 1.0);
+        vec2 sc = toC(suv);
+        float ds = depthAt(sc, suv);
+        float cocS = uBokeh * clamp(abs(ds - uFocusD) * 1.7, 0.0, 1.0);
+        float w;
+        if (ds >= d0 - 0.03) {
+            w = smoothstep(dist - 0.002, dist + 0.002, max(cocS, coc0));
+        } else {
+            w = smoothstep(dist - 0.002, dist + 0.002, coc0);
+        }
+        if (w <= 0.0) continue;
+        vec3 sc3 = fetchC(sc);
+        float lum = dot(sc3, vec3(0.299, 0.587, 0.114));
+        w *= 1.0 + uBoost * smoothstep(0.72, 1.0, lum) * 6.0;
+        acc += sc3 * w;
+        wsum += w;
+    }
+    return acc / wsum;
 }
 
 // LUT 3D 13x13x13 impaginata in una striscia 169x13 (fetta = blu, x = rosso, y = verde).
@@ -73,16 +172,7 @@ float hash12(vec2 p) {
 }
 
 void main() {
-    vec2 c = vUv - 0.5;
-    if (uOutAspect < uSrcAspect) {
-        c.x *= uOutAspect / uSrcAspect;
-    } else {
-        c.y *= uSrcAspect / uOutAspect;
-    }
-    if (uMirror > 0.5) c.x = -c.x;
-    c /= uZoom;
-    vec2 d = vec2(c.x * uSrcAspect, c.y);
-    c *= 1.0 + uDist * dot(d, d);
+    vec2 c = toC(vUv);
 
     vec3 col;
     if (uCA > 0.0) {
@@ -90,6 +180,7 @@ void main() {
     } else {
         col = fetchC(c);
     }
+    if (uBokeh > 0.0004) col = bokehBlur(vUv, c, col);
 
     float bt = smoothstep(0.12, 0.45, abs(vUv.y - 0.5)) * uTilt;
     float rad = uSoft * 0.010 + bt * 0.014;

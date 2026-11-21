@@ -85,11 +85,12 @@ fun CameraScreen(onAlbum: () -> Unit) {
     var ev by remember { mutableFloatStateOf(0f) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var focusPt by remember { mutableStateOf<Offset?>(null) }
+    var focusUV by remember { mutableStateOf(0.5f to 0.5f) }
     val pending = remember { AtomicReference<Bitmap?>(null) }
 
-    val look = remember(ci, li, fi, front, ev) {
+    val look = remember(ci, li, fi, front, ev, focusUV) {
         val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
-        l.copy(bri = l.bri + ev, mirror = front)
+        l.copy(bri = l.bri + ev, mirror = front, fpU = focusUV.first, fpV = focusUV.second)
     }
     val cam = CAMERAS[ci]
     val halfPair = cam.half && pair
@@ -125,10 +126,11 @@ fun CameraScreen(onAlbum: () -> Unit) {
         }
     }
 
-    fun finish(out: Bitmap?, neg: ByteArray?, consumePose: Boolean) {
+    fun finish(out: Bitmap?, neg: ByteArray?, dep: ByteArray?, consumePose: Boolean) {
         val name = if (out != null) CameraController.saveToGallery(ctx, out) else null
         out?.recycle()
         if (name != null && neg != null) CameraController.saveNegative(ctx, name, neg)
+        if (name != null && dep != null) DepthStore.save(ctx, name, dep)
         if (name == null) {
             fail()
             return
@@ -153,13 +155,13 @@ fun CameraScreen(onAlbum: () -> Unit) {
         }
         busy = true
         val pairNow = halfPair
-        controller.takePhoto(look, date && !pairNow) { bmp, neg ->
+        controller.takePhoto(look, date && !pairNow) { bmp, neg, dep ->
             if (bmp == null) {
                 fail()
                 return@takePhoto
             }
             if (!pairNow) {
-                finish(bmp, neg, true)
+                finish(bmp, neg, dep, true)
                 return@takePhoto
             }
             val first = pending.getAndSet(null)
@@ -179,14 +181,14 @@ fun CameraScreen(onAlbum: () -> Unit) {
             first.recycle()
             bmp.recycle()
             if (combo != null && date) CameraController.stampDate(combo)
-            finish(combo, null, true)
+            finish(combo, null, null, true)
         }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null && !busy) {
             busy = true
-            controller.importPhoto(ctx, uri, look, date) { bmp, neg -> finish(bmp, neg, false) }
+            controller.importPhoto(ctx, uri, look, date) { bmp, neg, dep -> finish(bmp, neg, dep, false) }
         }
     }
 
@@ -236,6 +238,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
                             .pointerInput(look) {
                                 detectTapGestures { off ->
                                     focusPt = off
+                                    focusUV = (off.x / size.width).coerceIn(0f, 1f) to (off.y / size.height).coerceIn(0f, 1f)
                                     controller.focusAt(off.x / size.width, off.y / size.height, look)
                                 }
                             }

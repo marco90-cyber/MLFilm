@@ -27,7 +27,7 @@ class FilmProcess {
         lutTex.reset()
     }
 
-    fun process(input: Bitmap, l: Look, maxSide: Int): Bitmap? {
+    fun process(input: Bitmap, l: Look, maxSide: Int, depth: Bitmap? = null): Bitmap? {
         val maxTex = IntArray(1)
         GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTex, 0)
         val limit = minOf(maxTex[0], maxSide)
@@ -56,8 +56,8 @@ class FilmProcess {
         oh = maxOf(oh, 2)
 
         val p = prog ?: GlProgram(FilmShader.FRAGMENT_2D).also { prog = it }
-        val ids = IntArray(2) // 0 = texture foto, 1 = texture destinazione
-        GLES20.glGenTextures(2, ids, 0)
+        val ids = IntArray(3) // 0 = texture foto, 1 = texture destinazione, 2 = profondità
+        GLES20.glGenTextures(3, ids, 0)
         val fbo = IntArray(1)
         GLES20.glGenFramebuffers(1, fbo, 0)
         try {
@@ -80,8 +80,31 @@ class FilmProcess {
             // la bitmap ha la riga 0 in alto: si inverte la coordinata verticale
             val m = floatArrayOf(1f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, 1f)
             GLES20.glUniformMatrix4fv(p.loc("uStM"), 1, false, m, 0)
-            FilmRenderer.applyLook(p, lutTex, l, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
-            drawQuad(p)
+            val useDepth = depth != null && l.fNum > 0f
+            if (useDepth) {
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE2)
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[2])
+                setupTex()
+                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, depth, 0)
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            }
+            val heavy = l.fNum > 0f
+            FilmRenderer.applyLook(p, lutTex, l, if (heavy) 44f else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
+            if (heavy && ow.toLong() * oh > 3_000_000L) {
+                // a fasce, per non far scattare il watchdog della GPU
+                GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
+                val band = 384
+                var y = 0
+                while (y < oh) {
+                    GLES20.glScissor(0, y, ow, minOf(band, oh - y))
+                    drawQuad(p)
+                    GLES20.glFinish()
+                    y += band
+                }
+                GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
+            } else {
+                drawQuad(p)
+            }
 
             val buf = ByteBuffer.allocateDirect(ow * oh * 4).order(ByteOrder.nativeOrder())
             GLES20.glReadPixels(0, 0, ow, oh, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
@@ -92,7 +115,7 @@ class FilmProcess {
         } finally {
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
             GLES20.glDeleteFramebuffers(1, fbo, 0)
-            GLES20.glDeleteTextures(2, ids, 0)
+            GLES20.glDeleteTextures(3, ids, 0)
             if (src !== input) src.recycle()
         }
     }

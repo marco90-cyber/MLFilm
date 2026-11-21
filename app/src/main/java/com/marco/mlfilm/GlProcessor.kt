@@ -20,11 +20,11 @@ class GlProcessor {
     private val proc = FilmProcess()
 
     /** [cb] viene chiamata sul thread del processore; la bitmap sorgente non viene riciclata. */
-    fun process(src: Bitmap, look: Look, maxSide: Int, cb: (Bitmap?) -> Unit) {
+    fun process(src: Bitmap, look: Look, maxSide: Int, depth: Bitmap? = null, cb: (Bitmap?) -> Unit) {
         handler.post {
             val out = try {
                 if (!ready) init()
-                if (ready) proc.process(src, look, maxSide) else null
+                if (ready) proc.process(src, look, maxSide, depth) else null
             } catch (e: Throwable) {
                 null
             }

@@ -95,7 +95,7 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
         GLES20.glUniform1i(prog.loc("uTex"), 0)
         GLES20.glUniformMatrix4fv(prog.loc("uStM"), 1, false, stm, 0)
-        applyLook(prog, lutTex, look, srcAspect, surfaceW.toFloat() / surfaceH.toFloat(), cos(rad), sin(rad), 1f, rnd.nextFloat() * 100f)
+        applyLook(prog, lutTex, look, 16f, false, srcAspect, surfaceW.toFloat() / surfaceH.toFloat(), cos(rad), sin(rad), 1f, rnd.nextFloat() * 100f)
         drawQuad(prog)
     }
 
@@ -121,16 +121,16 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
     private val proc = FilmProcess()
 
     /** Applica lo stesso effetto dell'anteprima a una foto già scattata. Va chiamata sul thread GL. */
-    fun processBitmap(input: Bitmap, l: Look): Bitmap? {
+    fun processBitmap(input: Bitmap, l: Look, depth: Bitmap? = null): Bitmap? {
         try {
-            return proc.process(input, l, 4096)
+            return proc.process(input, l, 4096, depth)
         } finally {
             GLES20.glViewport(0, 0, surfaceW, surfaceH)
         }
     }
 
     companion object {
-        fun applyLook(p: GlProgram, lut: LutTexture, l: Look, srcAspect: Float, outAspect: Float, rotCos: Float, rotSin: Float, flip: Float, seed: Float) {
+        fun applyLook(p: GlProgram, lut: LutTexture, l: Look, taps: Float, depthOn: Boolean, srcAspect: Float, outAspect: Float, rotCos: Float, rotSin: Float, flip: Float, seed: Float) {
             p.f1("uFlip", flip)
             p.f2("uRot", rotCos, rotSin)
             p.f1("uSrcAspect", srcAspect)
@@ -155,6 +155,16 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
             p.f1("uMirror", if (l.mirror) 1f else 0f)
             p.f2("uLeakPos", 0.92f, 0.08f)
             lut.bind(p, l.lut)
+            p.f1("uBokeh", blurRadius(l.fNum))
+            p.f1("uFocusD", l.focusDepth)
+            p.f2("uFocusPt", l.fpU, 1f - l.fpV)
+            p.f1("uShape", l.shape.toFloat())
+            p.f1("uSwirl", l.swirl)
+            p.f1("uCat", l.cat)
+            p.f1("uBoost", 0.25f + l.halation)
+            p.f1("uTaps", taps)
+            p.f1("uDepthOn", if (depthOn) 1f else 0f)
+            p.i1("uDepth", 2)
         }
     }
 

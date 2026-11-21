@@ -26,6 +26,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
+/** Risultato di uno scatto: foto sviluppata, negativo (JPEG) e mappa di profondità (PNG). */
+typealias ShotCb = (Bitmap?, ByteArray?, ByteArray?) -> Unit
+
 /** Collega mirino, scatto e salvataggio. */
 class CameraController {
     internal var renderer: FilmRenderer? = null
@@ -73,12 +76,12 @@ class CameraController {
     private val bg = Executors.newSingleThreadExecutor()
 
     /** Scatta, applica l'effetto e restituisce la foto finita (su un thread in background) oppure null. */
-    fun takePhoto(look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
+    fun takePhoto(look: Look, dateStamp: Boolean, onResult: ShotCb) {
         val ic = imageCapture
         val gl = glView
         val r = renderer
         if (ic == null || gl == null || r == null) {
-            onResult(null, null)
+            onResult(null, null, null)
             return
         }
         ic.takePicture(bg, object : ImageCapture.OnImageCapturedCallback() {
@@ -95,14 +98,14 @@ class CameraController {
                     image.close()
                 }
                 if (bmp == null) {
-                    onResult(null, null)
+                    onResult(null, null, null)
                     return
                 }
                 develop(bmp, look, dateStamp, onResult)
             }
 
             override fun onError(exception: ImageCaptureException) {
-                onResult(null, null)
+                onResult(null, null, null)
             }
         })
     }
@@ -111,20 +114,27 @@ class CameraController {
      * Applica l'effetto a una bitmap già in piedi (la bitmap passata viene riciclata).
      * Restituisce anche il "negativo": la foto senza effetto, per poterla sviluppare di nuovo dall'album.
      */
-    private fun develop(bmp: Bitmap, look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
+    private fun develop(bmp: Bitmap, look: Look, dateStamp: Boolean, onResult: ShotCb) {
         val gl = glView
         val r = renderer
         if (gl == null || r == null) {
             bmp.recycle()
-            onResult(null, null)
+            onResult(null, null, null)
             return
         }
+        // profondità (modello AI) prima del passaggio OpenGL; senza modello lo shader stima da solo
+        val depth = if (look.fNum > 0f) DepthEstimator.estimate(bmp) else null
+        val lk = if (depth != null) {
+            look.copy(focusDepth = DepthStore.focusDepth(depth, look, bmp.width.toFloat() / bmp.height, look.fpU, look.fpV))
+        } else look
+        val depPng = depth?.let { DepthStore.toPng(it) }
         gl.queueEvent {
             val out = try {
-                r.processBitmap(bmp, look)
+                r.processBitmap(bmp, lk, depth)
             } catch (e: Throwable) {
                 null
             }
+            depth?.recycle()
             bg.execute {
                 val neg = try {
                     val o = java.io.ByteArrayOutputStream()
@@ -135,20 +145,20 @@ class CameraController {
                 }
                 bmp.recycle()
                 if (out != null && dateStamp) stampDate(out)
-                onResult(out, neg)
+                onResult(out, neg, depPng)
             }
         }
     }
 
     /** Importa una foto dalla galleria e le applica la combinazione scelta. */
-    fun importPhoto(ctx: Context, uri: android.net.Uri, look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
+    fun importPhoto(ctx: Context, uri: android.net.Uri, look: Look, dateStamp: Boolean, onResult: ShotCb) {
         bg.execute {
             val bmp = try {
                 decodeUri(ctx, uri, 4096)
             } catch (e: Throwable) {
                 null
             }
-            if (bmp == null) onResult(null, null) else develop(bmp, look, dateStamp, onResult)
+            if (bmp == null) onResult(null, null, null) else develop(bmp, look, dateStamp, onResult)
         }
     }
 
