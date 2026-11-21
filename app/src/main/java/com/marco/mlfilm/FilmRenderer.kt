@@ -88,7 +88,9 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
                 return
             }
         }
-        val rad = rotation * PI.toFloat() / 180f
+        // Se la matrice della SurfaceTexture scambia già gli assi, contiene la rotazione: non va applicata due volte.
+        val effRot = if (Math.abs(stm[0]) < 0.5f) 0 else rotation
+        val rad = effRot * PI.toFloat() / 180f
         GLES20.glUseProgram(prog.id)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
