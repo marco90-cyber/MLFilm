@@ -41,6 +41,7 @@ uniform float uGrain;
 uniform float uHal;
 uniform float uSeed;
 uniform float uLeak;
+uniform float uMirror;
 uniform vec2 uLeakPos;
 
 vec3 fetchC(vec2 c) {
@@ -62,6 +63,7 @@ void main() {
     } else {
         c.y *= uSrcAspect / uOutAspect;
     }
+    if (uMirror > 0.5) c.x = -c.x;
     c /= uZoom;
     vec2 d = vec2(c.x * uSrcAspect, c.y);
     c *= 1.0 + uDist * dot(d, d);

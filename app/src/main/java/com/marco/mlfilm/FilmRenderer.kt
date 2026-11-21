@@ -223,6 +223,7 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
             p.f1("uHal", l.halation)
             p.f1("uSeed", seed)
             p.f1("uLeak", l.leak)
+            p.f1("uMirror", if (l.mirror) 1f else 0f)
             p.f2("uLeakPos", 0.92f, 0.08f)
         }
     }

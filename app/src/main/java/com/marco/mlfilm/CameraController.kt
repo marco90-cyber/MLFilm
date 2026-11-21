@@ -13,7 +13,10 @@ import android.opengl.GLSurfaceView
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.camera.core.Camera
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import java.io.File
@@ -28,6 +31,45 @@ class CameraController {
     internal var renderer: FilmRenderer? = null
     internal var glView: GLSurfaceView? = null
     internal var imageCapture: ImageCapture? = null
+    @Volatile internal var camera: Camera? = null
+
+    fun hasFlash(): Boolean = camera?.cameraInfo?.hasFlashUnit() == true
+
+    fun zoomRatio(): Float = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
+
+    /** Pizzico con le dita: moltiplica lo zoom attuale. */
+    fun zoomBy(factor: Float) {
+        val c = camera ?: return
+        val st = c.cameraInfo.zoomState.value ?: return
+        val r = (st.zoomRatio * factor).coerceIn(st.minZoomRatio, st.maxZoomRatio)
+        c.cameraControl.setZoomRatio(r)
+    }
+
+    /**
+     * Tocco sul mirino (u, v da 0 a 1, origine in alto a sinistra): converte il punto nello spazio del sensore
+     * seguendo gli stessi passaggi dello shader (ritaglio, zoom, rotazione) e chiede messa a fuoco ed esposizione.
+     */
+    fun focusAt(u: Float, v: Float, look: Look) {
+        val c = camera ?: return
+        val r = renderer ?: return
+        val srcA = r.srcAspect
+        var cx = u - 0.5f
+        var cy = 0.5f - v
+        if (look.mirror) cx = -cx
+        if (look.aspect < srcA) cx *= look.aspect / srcA else cy *= srcA / look.aspect
+        cx /= look.zoom
+        cy /= look.zoom
+        val th = Math.toRadians(r.rotation.toDouble())
+        val bx = (cx * Math.cos(th) - cy * Math.sin(th)).toFloat()
+        val by = (cx * Math.sin(th) + cy * Math.cos(th)).toFloat()
+        val px = (bx + 0.5f).coerceIn(0f, 1f)
+        val py = (0.5f - by).coerceIn(0f, 1f)
+        try {
+            val pt = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(px, py)
+            c.cameraControl.startFocusAndMetering(FocusMeteringAction.Builder(pt).build())
+        } catch (_: Exception) {
+        }
+    }
     private val bg = Executors.newSingleThreadExecutor()
 
     /** Scatta, applica l'effetto e restituisce la foto finita (su un thread in background) oppure null. */

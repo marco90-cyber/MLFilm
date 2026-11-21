@@ -80,6 +80,7 @@ data class Look(
     val tilt: Float = 0f,
     val leak: Float = 0f,
     val half: Boolean = false,
+    val mirror: Boolean = false,
 )
 
 fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(

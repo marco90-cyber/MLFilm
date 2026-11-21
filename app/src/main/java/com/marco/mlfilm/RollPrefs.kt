@@ -30,6 +30,10 @@ class RollPrefs(ctx: Context) {
         get() = sp.getBoolean("date", true)
         set(v) { sp.edit().putBoolean("date", v).apply() }
 
+    var grid: Boolean
+        get() = sp.getBoolean("grid", false)
+        set(v) { sp.edit().putBoolean("grid", v).apply() }
+
     /** Half Frame: true = due scatti in una foto, false = foto verticale singola. */
     var pair: Boolean
         get() = sp.getBoolean("pair", true)

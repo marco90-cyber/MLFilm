@@ -12,6 +12,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +26,7 @@ import androidx.lifecycle.LifecycleEventObserver
 
 /** Mirino: anteprima live della camera con l'effetto della combinazione scelta. */
 @Composable
-fun Viewfinder(look: Look, controller: CameraController, modifier: Modifier = Modifier) {
+fun Viewfinder(look: Look, controller: CameraController, front: Boolean, flashMode: Int, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val activity = ctx as ComponentActivity
     val main = remember { Handler(Looper.getMainLooper()) }
@@ -41,6 +42,7 @@ fun Viewfinder(look: Look, controller: CameraController, modifier: Modifier = Mo
             .build()
     }
     controller.imageCapture = capture
+    SideEffect { capture.flashMode = flashMode }
 
     val glView = remember {
         GLSurfaceView(ctx).apply {
@@ -66,7 +68,7 @@ fun Viewfinder(look: Look, controller: CameraController, modifier: Modifier = Mo
         }
     }
 
-    DisposableEffect(epoch) {
+    DisposableEffect(epoch, front) {
         if (epoch == 0) return@DisposableEffect onDispose { }
         val exec = ContextCompat.getMainExecutor(ctx)
         val future = ProcessCameraProvider.getInstance(ctx)
@@ -75,7 +77,8 @@ fun Viewfinder(look: Look, controller: CameraController, modifier: Modifier = Mo
             val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3).build()
             preview.setSurfaceProvider(exec) { req -> renderer.onSurfaceRequest(req, exec) }
             provider.unbindAll()
-            provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+            val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+            controller.camera = provider.bindToLifecycle(activity, selector, preview, capture)
         }, exec)
         onDispose {
             runCatching { if (future.isDone) future.get().unbindAll() }
