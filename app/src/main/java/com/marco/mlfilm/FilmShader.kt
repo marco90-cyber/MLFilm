@@ -43,11 +43,27 @@ uniform float uSeed;
 uniform float uLeak;
 uniform float uMirror;
 uniform vec2 uLeakPos;
+uniform sampler2D uLut;
+uniform float uLutOn;
 
 vec3 fetchC(vec2 c) {
     vec2 b = vec2(c.x * uRot.x - c.y * uRot.y, c.x * uRot.y + c.y * uRot.x) + 0.5;
     vec4 t = uStM * vec4(b, 0.0, 1.0);
     return texture2D(uTex, t.xy).rgb;
+}
+
+// LUT 3D 13x13x13 impaginata in una striscia 169x13 (fetta = blu, x = rosso, y = verde).
+vec3 lutFetch(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    float b = c.b * 12.0;
+    float b0 = floor(b);
+    float b1 = min(b0 + 1.0, 12.0);
+    float f = b - b0;
+    float y = (0.5 + c.g * 12.0) / 13.0;
+    float rx = 0.5 + c.r * 12.0;
+    vec3 a = texture2D(uLut, vec2((b0 * 13.0 + rx) / 169.0, y)).rgb;
+    vec3 d = texture2D(uLut, vec2((b1 * 13.0 + rx) / 169.0, y)).rgb;
+    return mix(a, d, f);
 }
 
 float hash12(vec2 p) {
@@ -94,6 +110,7 @@ void main() {
     }
 
     col *= uGain * exp2(uBri);
+    if (uLutOn > 0.5) col = lutFetch(col);
     col = (col - 0.5) * uCon + 0.5;
     float l = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(vec3(l), col, uSat);
@@ -156,6 +173,7 @@ class GlProgram(fragment: String) {
 
     fun f1(name: String, v: Float) = GLES20.glUniform1f(loc(name), v)
     fun f2(name: String, a: Float, b: Float) = GLES20.glUniform2f(loc(name), a, b)
+    fun i1(name: String, v: Int) = GLES20.glUniform1i(loc(name), v)
     fun f3(name: String, c: Rgb) = GLES20.glUniform3f(loc(name), c.r, c.g, c.b)
 
     private fun compile(type: Int, src: String): Int {
@@ -170,5 +188,59 @@ class GlProgram(fragment: String) {
             throw RuntimeException("Compilazione shader fallita: $log")
         }
         return s
+    }
+}
+
+/** Contesto dell'app, per leggere gli asset dai thread OpenGL. */
+object AppCtx {
+    lateinit var app: android.content.Context
+}
+
+/** Texture della LUT corrente per un contesto OpenGL: si ricarica solo quando cambia pellicola. */
+class LutTexture {
+    private var tex = 0
+    private var cur: String? = null
+
+    /** Da chiamare quando il contesto OpenGL viene ricreato. */
+    fun reset() {
+        tex = 0
+        cur = null
+    }
+
+    /** Lega la LUT sull'unità 1 e imposta uLut/uLutOn. */
+    fun bind(p: GlProgram, name: String?) {
+        var on = false
+        if (name != null) {
+            if (tex == 0) {
+                val t = IntArray(1)
+                GLES20.glGenTextures(1, t, 0)
+                tex = t[0]
+                cur = null
+            }
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex)
+            if (cur != name) {
+                val bmp = runCatching {
+                    AppCtx.app.assets.open(name).use {
+                        android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inScaled = false })
+                    }
+                }.getOrNull()
+                if (bmp != null) {
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+                    android.opengl.GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0)
+                    bmp.recycle()
+                    cur = name
+                } else {
+                    cur = null
+                }
+            }
+            on = cur == name
+            p.i1("uLut", 1)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        }
+        p.f1("uLutOn", if (on) 1f else 0f)
     }
 }

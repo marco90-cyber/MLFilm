@@ -1,0 +1,10 @@
+MLFilm - look di pellicola (LUT 3D)
+
+Le LUT in questa cartella derivono dalla raccolta "Film-Luts"
+(https://github.com/YahiaAngelo/Film-Luts, dichiarata MIT, (c) 2024 Yahia).
+I file originali sono preset di film emulation di G'MIC
+(https://gmic.eu, GREYC / David Tschumperle, licenza CeCILL, compatibile con GPL/LGPL).
+Sono stati ridotti a 13x13x13 e salvati come strisce PNG con tools/make_luts.py.
+
+I nomi delle pellicole indicano il look emulato e appartengono ai rispettivi
+proprietari; sono usati solo a scopo descrittivo.

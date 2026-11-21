@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppCtx.app = applicationContext
         enableEdgeToEdge()
         setContent { Root() }
     }

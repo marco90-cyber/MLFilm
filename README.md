@@ -11,3 +11,6 @@ e vedi l'effetto in anteprima live; ogni rullo ha 36 pose.
 - Le foto vengono salvate in `Pictures/MLFilm`
 
 Build: GitHub Actions sul ramo `main`, APK nelle Release.
+
+## Pellicole (LUT)
+296 look di pellicola come LUT 3D in `app/src/main/assets/luts` (origine: Film-Luts / preset G'MIC). Rigenerabili con `tools/make_luts.py`. Dettagli e licenze in `assets/luts/NOTICE.txt`.

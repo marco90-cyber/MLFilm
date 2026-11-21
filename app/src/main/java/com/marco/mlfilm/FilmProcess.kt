@@ -13,6 +13,7 @@ import java.nio.FloatBuffer
  */
 class FilmProcess {
     private var prog: GlProgram? = null
+    private val lutTex = LutTexture()
     private val rnd = java.util.Random()
     private val quad: FloatBuffer = ByteBuffer.allocateDirect(16 * 4).order(ByteOrder.nativeOrder())
         .asFloatBuffer().apply {
@@ -23,6 +24,7 @@ class FilmProcess {
     /** Da chiamare quando il contesto OpenGL viene ricreato. */
     fun reset() {
         prog = null
+        lutTex.reset()
     }
 
     fun process(input: Bitmap, l: Look, maxSide: Int): Bitmap? {
@@ -78,7 +80,7 @@ class FilmProcess {
             // la bitmap ha la riga 0 in alto: si inverte la coordinata verticale
             val m = floatArrayOf(1f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, 1f)
             GLES20.glUniformMatrix4fv(p.loc("uStM"), 1, false, m, 0)
-            FilmRenderer.applyLook(p, l, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
+            FilmRenderer.applyLook(p, lutTex, l, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
             drawQuad(p)
 
             val buf = ByteBuffer.allocateDirect(ow * oh * 4).order(ByteOrder.nativeOrder())

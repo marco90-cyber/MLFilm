@@ -1,7 +1,5 @@
 package com.marco.mlfilm
 
-import kotlin.math.pow
-
 /** Terna di colori usata da camere e pellicole. */
 data class Rgb(val r: Float, val g: Float, val b: Float) {
     operator fun times(o: Rgb) = Rgb(r * o.r, g * o.g, b * o.b)
@@ -43,22 +41,28 @@ data class LensSpec(
     val tilt: Float = 0f,
 )
 
-/** Pellicola: colore, contrasto, grana. */
+/** Pellicola: un look colore (LUT 3D negli asset) più grana e alone propri della famiglia. */
 data class FilmSpec(
-    val id: String,
+    val id: String,          // percorso asset senza estensione: "bw/ilford_delta_400"
     val name: String,
     val family: String,
     val iso: Int,
-    val gain: Rgb,
-    val sat: Float,
-    val con: Float,
-    val bri: Float,
-    val fade: Float,
-    val shadow: Rgb,
-    val high: Rgb,
-    val grain: Float,
-    val halation: Float,
-)
+) {
+    val lut: String get() = "luts/$id.png"
+    val grain: Float get() {
+        val base = when (family) {
+            "B&W" -> 0.075f
+            "Slide" -> 0.03f
+            "Instant", "Instant Pro" -> 0.045f
+            "Vintage Neg" -> 0.06f
+            "Print" -> 0.035f
+            else -> 0.05f
+        }
+        val k = if (iso > 0) Math.sqrt(iso / 100.0).toFloat().coerceIn(0.6f, 2.4f) else 1f
+        return base * k
+    }
+    val halation: Float get() = if (family == "Vintage Neg" || family == "Instant") 0.12f else 0.05f
+}
 
 /** Tutti i parametri già combinati, pronti per lo shader. */
 data class Look(
@@ -81,18 +85,18 @@ data class Look(
     val leak: Float = 0f,
     val half: Boolean = false,
     val mirror: Boolean = false,
+    val lut: String? = null,
 )
 
 fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(
     aspect = cam.aspect,
-    gain = cam.gain * film.gain,
-    sat = cam.sat * film.sat,
-    con = cam.con * film.con,
-    bri = cam.bri + film.bri,
-    fade = maxOf(cam.fade, film.fade),
-    shadow = film.shadow,
-    high = film.high,
+    gain = cam.gain,
+    sat = cam.sat,
+    con = cam.con,
+    bri = cam.bri,
+    fade = cam.fade,
     grain = film.grain * cam.grainMul,
+    lut = film.lut,
     halation = film.halation + lens.bloom,
     soft = cam.soft + lens.soft,
     vig = cam.vig + lens.vig,
@@ -156,64 +160,3 @@ val LENSES: List<LensSpec> = listOf(
     LensSpec("cine", "Cine 40mm", 1.4f, vig = 0.15f, ca = 0.004f, bloom = 0.3f),
     LensSpec("lomo", "Lomo 32mm", 1.15f, vig = 0.45f, ca = 0.003f, dist = 0.08f),
 )
-
-// ---------------------------------------------------------------- 120 pellicole
-
-private class Fam(
-    val name: String,
-    val gain: Rgb = ONE,
-    val sat: Float = 1f,
-    val con: Float = 1f,
-    val bri: Float = 0f,
-    val fade: Float = 0f,
-    val shadow: Rgb = ZERO,
-    val high: Rgb = ZERO,
-    val grain: Float = 0.05f,
-    val halation: Float = 0f,
-)
-
-private val FAMILIES = listOf(
-    Fam("Amber", Rgb(1.07f, 1.0f, 0.9f), 1.05f, 1.05f, high = Rgb(0.05f, 0.03f, -0.03f), grain = 0.06f),
-    Fam("Emerald", Rgb(0.96f, 1.05f, 0.98f), 1.1f, 1.08f, shadow = Rgb(-0.02f, 0.03f, 0.02f), grain = 0.055f),
-    Fam("Vivid", ONE, 1.4f, 1.15f, grain = 0.04f),
-    Fam("Clarity", Rgb(1.0f, 1.0f, 1.01f), 1.0f, 1.1f, grain = 0.035f),
-    Fam("Portrait", Rgb(1.05f, 1.0f, 0.96f), 0.95f, 0.95f, fade = 0.02f, high = Rgb(0.04f, 0.02f, 0f), grain = 0.045f),
-    Fam("Dusk", Rgb(0.98f, 0.96f, 1.04f), 1.05f, 1.1f, shadow = Rgb(0.04f, -0.02f, 0.05f), high = Rgb(0.03f, 0.01f, -0.02f), grain = 0.06f),
-    Fam("Harbor", Rgb(0.93f, 0.99f, 1.08f), 1.0f, 1.08f, shadow = Rgb(-0.02f, 0.01f, 0.04f), grain = 0.05f),
-    Fam("Meadow", Rgb(0.98f, 1.06f, 0.92f), 1.12f, 1.04f, high = Rgb(0.02f, 0.04f, -0.03f), grain = 0.05f),
-    Fam("Ember", Rgb(1.1f, 0.97f, 0.88f), 1.2f, 1.12f, shadow = Rgb(0.04f, -0.01f, -0.02f), grain = 0.06f, halation = 0.25f),
-    Fam("Velvet", Rgb(1.0f, 0.97f, 1.02f), 0.92f, 0.88f, fade = 0.05f, shadow = Rgb(0.04f, 0.0f, 0.05f), grain = 0.05f),
-    Fam("Sunday", Rgb(1.05f, 1.01f, 0.92f), 0.88f, 0.9f, bri = 0.06f, fade = 0.07f, high = Rgb(0.04f, 0.03f, 0f), grain = 0.055f),
-    Fam("Cinema", Rgb(1.03f, 1.0f, 0.97f), 1.05f, 1.15f, shadow = Rgb(-0.04f, 0.02f, 0.05f), high = Rgb(0.06f, 0.025f, -0.04f), grain = 0.05f, halation = 0.15f),
-    Fam("Pastel", Rgb(1.02f, 1.01f, 1.02f), 0.75f, 0.82f, bri = 0.08f, fade = 0.08f, grain = 0.04f),
-    Fam("Citrus", Rgb(1.03f, 1.05f, 0.9f), 1.18f, 1.06f, high = Rgb(0.03f, 0.04f, -0.04f), grain = 0.05f),
-    Fam("Polar", Rgb(0.95f, 1.0f, 1.07f), 0.9f, 1.05f, bri = 0.03f, high = Rgb(-0.01f, 0.01f, 0.03f), grain = 0.045f),
-    Fam("Rust", Rgb(1.08f, 0.96f, 0.86f), 1.0f, 1.1f, fade = 0.04f, shadow = Rgb(0.03f, 0.0f, -0.02f), grain = 0.065f, halation = 0.2f),
-    Fam("Mono", Rgb(1f, 1f, 1f), 0f, 1.12f, grain = 0.06f, high = Rgb(0.01f, 0.01f, 0.01f)),
-    Fam("Ink", Rgb(1f, 1f, 1f), 0f, 1.4f, bri = -0.05f, grain = 0.09f),
-    Fam("Silver", Rgb(1f, 1f, 1f), 0f, 0.95f, fade = 0.04f, grain = 0.1f, high = Rgb(0.0f, 0.0f, 0.02f)),
-    Fam("Sepia", Rgb(1f, 1f, 1f), 0f, 1.0f, fade = 0.05f, shadow = Rgb(0.06f, 0.03f, -0.02f), high = Rgb(0.1f, 0.06f, -0.03f), grain = 0.07f),
-)
-
-private val ISOS = listOf(50, 100, 200, 400, 800, 1600)
-
-val FILMS: List<FilmSpec> = FAMILIES.flatMap { f ->
-    ISOS.map { iso ->
-        val s = Math.log((iso / 100.0)).div(Math.log(2.0)).toFloat() // -1 .. 4
-        FilmSpec(
-            id = "${f.name.lowercase()}$iso",
-            name = "${f.name} $iso",
-            family = f.name,
-            iso = iso,
-            gain = f.gain,
-            sat = f.sat * (1f - 0.035f * s),
-            con = f.con * (1f + 0.025f * s),
-            bri = f.bri + 0.03f * s,
-            fade = f.fade,
-            shadow = f.shadow,
-            high = f.high,
-            grain = f.grain * (iso / 100f).pow(0.5f),
-            halation = f.halation,
-        )
-    }
-}

@@ -162,26 +162,16 @@ fun LensGlyph(spec: LensSpec, modifier: Modifier = Modifier) {
 }
 
 fun familyColor(f: String): Color = when (f) {
-    "Amber" -> Color(0xFFF5A623)
-    "Emerald" -> Color(0xFF2FBF71)
-    "Vivid" -> Color(0xFFE5392B)
-    "Clarity" -> Color(0xFF3FA7F5)
-    "Portrait" -> Color(0xFFF2B6A0)
-    "Dusk" -> Color(0xFF9B5DE5)
-    "Harbor" -> Color(0xFF2C6FBB)
-    "Meadow" -> Color(0xFF8BC34A)
-    "Ember" -> Color(0xFFD9441F)
-    "Velvet" -> Color(0xFF7B4B94)
-    "Sunday" -> Color(0xFFE8C27A)
-    "Cinema" -> Color(0xFF1E8A8A)
-    "Pastel" -> Color(0xFFF4A6C0)
-    "Citrus" -> Color(0xFFD6E02A)
-    "Polar" -> Color(0xFF9FD3F0)
-    "Rust" -> Color(0xFFA8532B)
-    "Mono" -> Color(0xFFCCCCCC)
-    "Ink" -> Color(0xFFEEEEEE)
-    "Silver" -> Color(0xFFA0A0A0)
-    else -> Color(0xFF8B6A45)
+    "B&W" -> Color(0xFFB8B8B8)
+    "Slide" -> Color(0xFF3FA7F5)
+    "Fuji X" -> Color(0xFF2FBF71)
+    "Instant" -> Color(0xFFF4A6C0)
+    "Instant Pro" -> Color(0xFFE8C27A)
+    "Color Neg" -> Color(0xFFF5A623)
+    "Negative" -> Color(0xFFD9441F)
+    "Vintage Neg" -> Color(0xFF9B5DE5)
+    "Print" -> Color(0xFF1E8A8A)
+    else -> Color(0xFF888888)
 }
 
 @Composable
