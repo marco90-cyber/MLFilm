@@ -127,7 +127,7 @@ fun AlbumScreen(onOpen: (Uri) -> Unit) {
 }
 
 @Composable
-fun ViewerScreen(uri: Uri, onBack: () -> Unit) {
+fun ViewerScreen(uri: Uri, onBack: () -> Unit, onEdit: () -> Unit) {
     val ctx = LocalContext.current
     val bmp by produceState<ImageBitmap?>(null, uri) {
         value = loadBitmap(ctx, uri, 2048)?.asImageBitmap()
@@ -135,6 +135,7 @@ fun ViewerScreen(uri: Uri, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onBack() })
+            Mono("MODIFICA", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onEdit() })
             Mono(
                 "CONDIVIDI", color = C.Amber, size = 13.sp,
                 modifier = Modifier.clickable {

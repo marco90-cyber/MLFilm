@@ -58,8 +58,9 @@ private fun Root() {
 
     var album by remember { mutableStateOf(false) }
     var viewer by remember { mutableStateOf<Uri?>(null) }
-    BackHandler(enabled = album || viewer != null) {
-        if (viewer != null) viewer = null else album = false
+    var editing by remember { mutableStateOf<Uri?>(null) }
+    BackHandler(enabled = album || viewer != null || editing != null) {
+        if (editing != null) editing = null else if (viewer != null) viewer = null else album = false
     }
 
     Box(Modifier.fillMaxSize().background(C.Bg)) {
@@ -67,8 +68,11 @@ private fun Root() {
             Mono("SERVE IL PERMESSO CAMERA", color = C.Amber, size = 13.sp, modifier = Modifier.align(Alignment.Center))
         } else {
             val v = viewer
-            if (v != null) {
-                ViewerScreen(v) { viewer = null }
+            val e = editing
+            if (e != null) {
+                EditorScreen(e, { editing = null }, { editing = null; viewer = null })
+            } else if (v != null) {
+                ViewerScreen(v, { viewer = null }, { editing = v })
             } else if (album) {
                 AlbumScreen { viewer = it }
             } else {

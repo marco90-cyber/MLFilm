@@ -73,12 +73,12 @@ class CameraController {
     private val bg = Executors.newSingleThreadExecutor()
 
     /** Scatta, applica l'effetto e restituisce la foto finita (su un thread in background) oppure null. */
-    fun takePhoto(look: Look, dateStamp: Boolean, onResult: (Bitmap?) -> Unit) {
+    fun takePhoto(look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
         val ic = imageCapture
         val gl = glView
         val r = renderer
         if (ic == null || gl == null || r == null) {
-            onResult(null)
+            onResult(null, null)
             return
         }
         ic.takePicture(bg, object : ImageCapture.OnImageCapturedCallback() {
@@ -95,25 +95,28 @@ class CameraController {
                     image.close()
                 }
                 if (bmp == null) {
-                    onResult(null)
+                    onResult(null, null)
                     return
                 }
                 develop(bmp, look, dateStamp, onResult)
             }
 
             override fun onError(exception: ImageCaptureException) {
-                onResult(null)
+                onResult(null, null)
             }
         })
     }
 
-    /** Applica l'effetto a una bitmap già in piedi (la bitmap passata viene riciclata). */
-    private fun develop(bmp: Bitmap, look: Look, dateStamp: Boolean, onResult: (Bitmap?) -> Unit) {
+    /**
+     * Applica l'effetto a una bitmap già in piedi (la bitmap passata viene riciclata).
+     * Restituisce anche il "negativo": la foto senza effetto, per poterla sviluppare di nuovo dall'album.
+     */
+    private fun develop(bmp: Bitmap, look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
         val gl = glView
         val r = renderer
         if (gl == null || r == null) {
             bmp.recycle()
-            onResult(null)
+            onResult(null, null)
             return
         }
         gl.queueEvent {
@@ -122,23 +125,30 @@ class CameraController {
             } catch (e: Throwable) {
                 null
             }
-            bmp.recycle()
             bg.execute {
+                val neg = try {
+                    val o = java.io.ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 92, o)
+                    o.toByteArray()
+                } catch (e: Throwable) {
+                    null
+                }
+                bmp.recycle()
                 if (out != null && dateStamp) stampDate(out)
-                onResult(out)
+                onResult(out, neg)
             }
         }
     }
 
     /** Importa una foto dalla galleria e le applica la combinazione scelta. */
-    fun importPhoto(ctx: Context, uri: android.net.Uri, look: Look, dateStamp: Boolean, onResult: (Bitmap?) -> Unit) {
+    fun importPhoto(ctx: Context, uri: android.net.Uri, look: Look, dateStamp: Boolean, onResult: (Bitmap?, ByteArray?) -> Unit) {
         bg.execute {
             val bmp = try {
                 decodeUri(ctx, uri, 4096)
             } catch (e: Throwable) {
                 null
             }
-            if (bmp == null) onResult(null) else develop(bmp, look, dateStamp, onResult)
+            if (bmp == null) onResult(null, null) else develop(bmp, look, dateStamp, onResult)
         }
     }
 
@@ -217,8 +227,8 @@ class CameraController {
             c.drawText(text, x, y, p)
         }
 
-        /** Salva in Pictures/MLFilm e restituisce true se è andato a buon fine. */
-        fun saveToGallery(ctx: Context, bmp: Bitmap): Boolean {
+        /** Salva in Pictures/MLFilm e restituisce il nome del file (senza estensione), oppure null se fallisce. */
+        fun saveToGallery(ctx: Context, bmp: Bitmap): String? {
             val name = "MLFilm_" + SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
             return try {
                 if (Build.VERSION.SDK_INT >= 29) {
@@ -229,28 +239,41 @@ class CameraController {
                         put(MediaStore.Images.Media.IS_PENDING, 1)
                     }
                     val resolver = ctx.contentResolver
-                    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+                    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
                     try {
                         resolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) }
                             ?: throw java.io.IOException("stream nullo")
                         val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
                         resolver.update(uri, done, null, null)
-                        true
+                        name
                     } catch (e: Exception) {
                         resolver.delete(uri, null, null)
-                        false
+                        null
                     }
                 } else {
                     val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MLFilm")
-                    if (!dir.exists() && !dir.mkdirs()) return false
+                    if (!dir.exists() && !dir.mkdirs()) return null
                     val f = File(dir, "$name.jpg")
                     FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) }
                     MediaScannerConnection.scanFile(ctx, arrayOf(f.absolutePath), arrayOf("image/jpeg"), null)
-                    true
+                    name
                 }
             } catch (e: Exception) {
-                false
+                null
             }
         }
+
+        private fun negDir(ctx: Context): File = File(ctx.filesDir, "negatives").apply { mkdirs() }
+
+        /** Conserva il negativo (foto senza effetto) accanto alla foto salvata. */
+        fun saveNegative(ctx: Context, name: String, bytes: ByteArray) {
+            try {
+                File(negDir(ctx), "$name.jpg").writeBytes(bytes)
+            } catch (_: Exception) {
+            }
+        }
+
+        fun negativeFile(ctx: Context, name: String): File? =
+            File(negDir(ctx), "$name.jpg").takeIf { it.exists() }
     }
 }

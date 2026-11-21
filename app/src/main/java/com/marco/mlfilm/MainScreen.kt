@@ -99,7 +99,18 @@ fun CameraScreen(onAlbum: () -> Unit) {
         pending.getAndSet(null)?.recycle()
         pendingShown = false
     }
-    LaunchedEffect(front) { zoom = 1f }
+    var flashOk by remember { mutableStateOf(false) }
+    LaunchedEffect(front) {
+        zoom = 1f
+        flashOk = false
+        repeat(20) {
+            delay(250)
+            if (controller.hasFlash()) {
+                flashOk = true
+                return@LaunchedEffect
+            }
+        }
+    }
     LaunchedEffect(focusPt) {
         if (focusPt != null) {
             delay(900)
@@ -114,10 +125,11 @@ fun CameraScreen(onAlbum: () -> Unit) {
         }
     }
 
-    fun finish(out: Bitmap?, consumePose: Boolean) {
-        val ok = out != null && CameraController.saveToGallery(ctx, out)
+    fun finish(out: Bitmap?, neg: ByteArray?, consumePose: Boolean) {
+        val name = if (out != null) CameraController.saveToGallery(ctx, out) else null
         out?.recycle()
-        if (!ok) {
+        if (name != null && neg != null) CameraController.saveNegative(ctx, name, neg)
+        if (name == null) {
             fail()
             return
         }
@@ -141,13 +153,13 @@ fun CameraScreen(onAlbum: () -> Unit) {
         }
         busy = true
         val pairNow = halfPair
-        controller.takePhoto(look, date && !pairNow) { bmp ->
+        controller.takePhoto(look, date && !pairNow) { bmp, neg ->
             if (bmp == null) {
                 fail()
                 return@takePhoto
             }
             if (!pairNow) {
-                finish(bmp, true)
+                finish(bmp, neg, true)
                 return@takePhoto
             }
             val first = pending.getAndSet(null)
@@ -167,14 +179,14 @@ fun CameraScreen(onAlbum: () -> Unit) {
             first.recycle()
             bmp.recycle()
             if (combo != null && date) CameraController.stampDate(combo)
-            finish(combo, true)
+            finish(combo, null, true)
         }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null && !busy) {
             busy = true
-            controller.importPhoto(ctx, uri, look, date) { bmp -> finish(bmp, false) }
+            controller.importPhoto(ctx, uri, look, date) { bmp, neg -> finish(bmp, neg, false) }
         }
     }
 
@@ -247,7 +259,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Chip("FLIP", front) { front = !front }
-                        if (!front && controller.hasFlash()) {
+                        if (!front && flashOk) {
                             Chip("FLASH " + FLASH_MODES[flashIdx].first, flashIdx != 0) {
                                 flashIdx = (flashIdx + 1) % FLASH_MODES.size
                             }
@@ -333,7 +345,7 @@ fun Chip(text: String, on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RowScope.Slot(
+fun RowScope.Slot(
     label: String,
     name: String,
     active: Boolean,
