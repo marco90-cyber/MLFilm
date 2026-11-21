@@ -9,6 +9,13 @@ CATS = {"bw":"B&W","colorslide":"Slide","fujixtransiii":"Fuji X","instant_consum
 os.makedirs(OUT, exist_ok=True)
 items=[]
 def pretty(stem):
+    suf = ''
+    m = re.search(r'_(\+\+|\+|-)$', stem)
+    if m:
+        suf = {'++': ' ++', '+': ' +', '-': ' \u2212'}[m.group(1)]
+        stem = stem[:m.start()]
+    return pretty0(stem) + suf
+def pretty0(stem):
     s = re.sub(r'[_\-]+',' ',stem).strip()
     s = re.sub(r'\s+',' ',s)
     return ' '.join(w if w.isdigit() else w.capitalize() for w in s.split())

@@ -1,0 +1,19 @@
+name: depthprobe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install ai-edge-litert numpy pillow
+      - name: Scarica modello e immagine
+        run: |
+          mkdir -p work out
+          curl -fL -o work/dav2.tflite https://huggingface.co/qualcomm/Depth-Anything-V2/resolve/1dfdee5dd136dda59b8a2d34a8e09615472175d5/Depth-Anything-V2.tflite
+          curl -fL -o work/test.jpg https://raw.githubusercontent.com/YahiaAngelo/Film-Luts/main/test_image.jpg
+          ls -la work
+      - run: python tools/depth_probe.py work/dav2.tflite work/test.jpg out 2>&1 | tee out/log.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: depth, path: out }
