@@ -12,7 +12,7 @@ import java.nio.FloatBuffer
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengl.GL10
+import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
