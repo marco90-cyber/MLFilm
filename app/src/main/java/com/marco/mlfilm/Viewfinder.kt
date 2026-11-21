@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,20 +25,29 @@ import androidx.lifecycle.LifecycleEventObserver
 
 /** Mirino: anteprima live della camera con l'effetto della combinazione scelta. */
 @Composable
-fun Viewfinder(look: Look, modifier: Modifier = Modifier) {
+fun Viewfinder(look: Look, controller: CameraController, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val activity = ctx as ComponentActivity
     val main = remember { Handler(Looper.getMainLooper()) }
     var epoch by remember { mutableIntStateOf(0) }
     val renderer = remember { FilmRenderer { main.post { epoch++ } } }
     renderer.look = look
+    controller.renderer = renderer
+    val capture = remember {
+        ImageCapture.Builder()
+            .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setJpegQuality(95)
+            .build()
+    }
+    controller.imageCapture = capture
 
     val glView = remember {
         GLSurfaceView(ctx).apply {
             setEGLContextClientVersion(2)
             setRenderer(renderer)
             renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        }
+        }.also { controller.glView = it }
     }
 
     DisposableEffect(glView) {
@@ -65,7 +75,7 @@ fun Viewfinder(look: Look, modifier: Modifier = Modifier) {
             val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3).build()
             preview.setSurfaceProvider(exec) { req -> renderer.onSurfaceRequest(req, exec) }
             provider.unbindAll()
-            provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+            provider.bindToLifecycle(activity, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
         }, exec)
         onDispose {
             runCatching { if (future.isDone) future.get().unbindAll() }
