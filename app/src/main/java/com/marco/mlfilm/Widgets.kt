@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +45,7 @@ fun RowScope.Slot(
     glyph: @Composable (Modifier) -> Unit,
 ) {
     Column(
-        Modifier.weight(1f).clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.width(98.dp).clickable { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Mono(label, size = 10.sp)
         Spacer(Modifier.height(6.dp))

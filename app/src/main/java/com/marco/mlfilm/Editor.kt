@@ -94,6 +94,7 @@ private data class Edit(
     val ci: Int, val li: Int, val fi: Int, val ap: Float, val sh: Int,
     val flare: Float, val star: Float, val sf: Float, val cs: Float, val apod: Float,
     val fd: Float, val fpU: Float, val fpV: Float, val hi: Float, val viv: Float, val snap: Int,
+    val adj: Adj = Adj(),
 )
 
 private class History(val items: List<Edit>, val idx: Int)
@@ -119,6 +120,8 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var ap by remember { mutableFloatStateOf(lensAp(LENSES[0].f)) }
     var apDrag by remember { mutableStateOf(false) }
     var sh by remember { mutableIntStateOf(LENSES[0].shape) }
+    var adj by remember { mutableStateOf(Adj()) }
+    var adjTab by remember { mutableIntStateOf(0) }
     var flare by remember { mutableFloatStateOf(0f) }
     var star by remember { mutableFloatStateOf(0f) }
     var sf by remember { mutableFloatStateOf(0f) }
@@ -140,7 +143,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var nextSnap by remember { mutableIntStateOf(1) }
     val snaps = remember { HashMap<Int, Bitmap>() }
 
-    fun editNow() = Edit(ci, li, fi, ap, sh, flare, star, sf, cs, apod, fd, fp.first, fp.second, hi, viv, snapId)
+    fun editNow() = Edit(ci, li, fi, ap, sh, flare, star, sf, cs, apod, fd, fp.first, fp.second, hi, viv, snapId, adj)
     var hist by remember { mutableStateOf(History(listOf(editNow()), 0)) }
     val cur = editNow()
     LaunchedEffect(cur) {
@@ -161,7 +164,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         val base = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
         val l = base.copy(
             fNum = ap, shape = sh, focusDepth = fd, fpU = fp.first, fpV = fp.second,
-            flare = flare, star = star, apod = apod, hi = hi, viv = viv,
+            flare = flare, star = star, apod = apod, hi = hi, viv = viv, adj = adj,
             soft = base.soft + sf * 0.9f, halation = base.halation + sf * 0.35f,
             shadow = Rgb(base.shadow.r - cs * 0.02f, base.shadow.g + cs * 0.015f, base.shadow.b + cs * 0.05f),
             high = Rgb(base.high.r + cs * 0.05f, base.high.g + cs * 0.02f, base.high.b - cs * 0.04f),
@@ -232,7 +235,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     fun applyEdit(e: Edit) {
         ci = e.ci; li = e.li; fi = e.fi; ap = e.ap; sh = e.sh
         flare = e.flare; star = e.star; sf = e.sf; cs = e.cs; apod = e.apod
-        fd = e.fd; fp = e.fpU to e.fpV; hi = e.hi; viv = e.viv
+        fd = e.fd; fp = e.fpU to e.fpV; hi = e.hi; viv = e.viv; adj = e.adj
         if (e.snap != snapId) snaps[e.snap]?.let { depth = it.copy(Bitmap.Config.ARGB_8888, true); depthVer++ }
         snapId = e.snap
     }
@@ -503,12 +506,13 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         }
 
         ClapperStripe(Modifier.padding(horizontal = 12.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel).horizontalScroll(rememberScrollState())) {
             Slot("CAMERA", CAMERAS[ci].name, open == 0, false, { open = if (open == 0) -1 else 0 }) { CameraGlyph(CAMERAS[ci].id, it) }
             Slot("LENS", LENSES[li].name, open == 1, false, { open = if (open == 1) -1 else 1 }) { LensGlyph(LENSES[li], it) }
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
             Slot("APERTURA", fmtF(ap), open == 3, false, { open = if (open == 3) -1 else 3 }) { ApertureGlyph(ap, it) }
             Slot("EFFETTI", if (flare + star + sf + apod > 0.01f || Math.abs(cs) > 0.01f) "ON" else "OFF", open == 4, false, { open = if (open == 4) -1 else 4 }) { EffectGlyph(it) }
+            Slot("REGOLA", if (adj.on) "ON" else "OFF", open == 5, false, { open = if (open == 5) -1 else 5 }) { AdjustGlyph(adj.on, it) }
         }
         if (open >= 0) {
             val panel = Modifier.fillMaxWidth().height(280.dp)
@@ -521,6 +525,42 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                     { LENSES[it].name }, { lensSub(LENSES[it]) }, panel,
                 ) { i, m -> LensGlyph(LENSES[i], m) }
                 2 -> FilmPicker(fi, { fi = it; prefs.film = it }, Modifier.fillMaxWidth().height(190.dp))
+                5 -> Column(panel.background(C.Panel)) {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        listOf("LUCE", "COLORE", "DETTAGLIO").forEachIndexed { i, n -> Chip(n, adjTab == i) { adjTab = i } }
+                        Chip("AZZERA", false) { adj = Adj() }
+                    }
+                    Column(
+                        Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        when (adjTab) {
+                            0 -> {
+                                FxSlider("ESPOSIZIONE", adj.exp, -1f..1f) { adj = adj.copy(exp = it) }
+                                FxSlider("CONTRASTO", adj.con, -1f..1f) { adj = adj.copy(con = it) }
+                                FxSlider("ALTE LUCI", adj.hi, -1f..1f) { adj = adj.copy(hi = it) }
+                                FxSlider("OMBRE", adj.sh, -1f..1f) { adj = adj.copy(sh = it) }
+                                FxSlider("BIANCHI", adj.wh, -1f..1f) { adj = adj.copy(wh = it) }
+                                FxSlider("NERI", adj.bl, -1f..1f) { adj = adj.copy(bl = it) }
+                            }
+                            1 -> {
+                                FxSlider("TEMPERATURA", adj.temp, -1f..1f) { adj = adj.copy(temp = it) }
+                                FxSlider("TINTA", adj.tint, -1f..1f) { adj = adj.copy(tint = it) }
+                                FxSlider("SATURAZIONE", adj.sat, -1f..1f) { adj = adj.copy(sat = it) }
+                                FxSlider("VIBRANZA", adj.vib, -1f..1f) { adj = adj.copy(vib = it) }
+                            }
+                            else -> {
+                                FxSlider("NITIDEZZA", adj.sharp, 0f..1f) { adj = adj.copy(sharp = it) }
+                                FxSlider("CHIAREZZA", adj.clar, -1f..1f) { adj = adj.copy(clar = it) }
+                                FxSlider("DEHAZE", adj.haze, -1f..1f) { adj = adj.copy(haze = it) }
+                            }
+                        }
+                        Mono("TOCCA UN NOME PER AZZERARLO", color = C.Dim, size = 9.sp)
+                    }
+                }
                 4 -> Column(
                     panel.background(C.Panel).verticalScroll(rememberScrollState()).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -647,5 +687,6 @@ private fun FxSlider(label: String, value: Float, range: ClosedFloatingPointRang
             colors = SliderDefaults.colors(thumbColor = C.Amber, activeTrackColor = C.Amber, inactiveTrackColor = C.Line),
             modifier = Modifier.weight(1f),
         )
+        Mono(Math.round(value * 100f).toString(), color = C.Text, size = 10.sp, modifier = Modifier.width(34.dp))
     }
 }

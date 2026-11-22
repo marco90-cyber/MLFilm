@@ -198,6 +198,53 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+uniform float uAdjOn;
+uniform float uAExp, uACon, uAHi, uASh, uAWh, uABl, uATemp, uATint, uASat, uAVib, uASharp, uAClar, uAHaze;
+
+// regolazioni manuali (luce, colore, dettaglio) applicate prima del look pellicola
+vec3 adjustCol(vec3 col, vec2 c) {
+    if (uASharp > 0.001 || abs(uAClar) > 0.001) {
+        vec3 bs = vec3(0.0);
+        vec3 bb = vec3(0.0);
+        for (int i = 0; i < 8; i++) {
+            float a = float(i) * 0.785398;
+            vec2 o = vec2(cos(a), sin(a));
+            bs += fetchC(c + o * 0.0025);
+            bb += fetchC(c + o * 0.012);
+        }
+        bs /= 8.0;
+        bb /= 8.0;
+        float l0 = dot(col, vec3(0.299, 0.587, 0.114));
+        col += (col - bs) * uASharp * 2.0;
+        col += (col - bb) * uAClar * 1.2 * (1.0 - abs(l0 * 2.0 - 1.0));
+    }
+    col *= exp2(uAExp * 1.5);
+    col.r *= 1.0 + uATemp * 0.25;
+    col.b *= 1.0 - uATemp * 0.25;
+    col.g *= 1.0 - uATint * 0.15;
+    col = max(col, vec3(0.0));
+    float l = clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    float sw = (1.0 - l) * (1.0 - l);
+    float hw = l * l;
+    col *= 1.0 + uASh * 0.6 * sw;
+    col *= 1.0 + uAHi * 0.4 * hw;
+    col *= 1.0 + uAWh * 0.3 * smoothstep(0.5, 1.0, l);
+    col += uABl * 0.12 * (1.0 - smoothstep(0.0, 0.5, l));
+    col = (col - 0.5) * (1.0 + uACon * 0.8) + 0.5;
+    if (uAHaze > 0.0) {
+        float t = min(col.r, min(col.g, col.b)) * uAHaze * 0.85;
+        col = (col - t) / max(1.0 - t, 0.05);
+    } else if (uAHaze < 0.0) {
+        col = mix(col, vec3(0.7), -uAHaze * 0.35);
+    }
+    float l2 = dot(col, vec3(0.299, 0.587, 0.114));
+    float mx = max(col.r, max(col.g, col.b));
+    float mn = min(col.r, min(col.g, col.b));
+    float sat0 = (mx - mn) / max(mx, 0.0001);
+    col = mix(vec3(l2), col, max(0.0, 1.0 + uASat + uAVib * (1.0 - sat0)));
+    return max(col, vec3(0.0));
+}
+
 void main() {
     vec2 c = toC(vUv);
 
@@ -253,6 +300,7 @@ void main() {
     }
 
     col *= uGain * exp2(uBri);
+    if (uAdjOn > 0.5) col = adjustCol(col, c);
     if (uLutOn > 0.5) col = lutFetch(col);
     col = (col - 0.5) * uCon + 0.5;
     float l = dot(col, vec3(0.299, 0.587, 0.114));

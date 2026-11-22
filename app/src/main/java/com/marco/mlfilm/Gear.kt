@@ -28,6 +28,15 @@ data class CameraSpec(
     val half: Boolean = false,
 )
 
+/** Regolazioni stile Snapseed/Lightroom, tutte da -1 a +1 (0 = spento); nitidezza da 0 a 1. */
+data class Adj(
+    val exp: Float = 0f, val con: Float = 0f, val hi: Float = 0f, val sh: Float = 0f, val wh: Float = 0f, val bl: Float = 0f,
+    val temp: Float = 0f, val tint: Float = 0f, val sat: Float = 0f, val vib: Float = 0f,
+    val sharp: Float = 0f, val clar: Float = 0f, val haze: Float = 0f,
+) {
+    val on: Boolean get() = this != Adj()
+}
+
 /** Obiettivo: lunghezza focale, apertura di default e forma del bokeh (la sfocatura usa la profondità). */
 data class LensSpec(
     val id: String,
@@ -128,6 +137,7 @@ data class Look(
     val hi: Float = 0f,          // luminosità delle luci sfocate (bokeh), 0..1
     val viv: Float = 0f,         // colore delle luci sfocate (bokeh), 0..1
     val apod: Float = 0f,        // bokeh morbido e passaggio di fuoco graduale ("fuoco sfuggente")
+    val adj: Adj = Adj(),        // regolazioni manuali (REGOLA)
 )
 
 fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(

@@ -180,6 +180,11 @@ class FilmProcess {
             p.f1("uApod", l.apod)
             p.f1("uBokHi", l.hi)
             p.f1("uBokViv", l.viv)
+            val a = l.adj
+            p.f1("uAdjOn", if (a.on) 1f else 0f)
+            p.f1("uAExp", a.exp); p.f1("uACon", a.con); p.f1("uAHi", a.hi); p.f1("uASh", a.sh)
+            p.f1("uAWh", a.wh); p.f1("uABl", a.bl); p.f1("uATemp", a.temp); p.f1("uATint", a.tint)
+            p.f1("uASat", a.sat); p.f1("uAVib", a.vib); p.f1("uASharp", a.sharp); p.f1("uAClar", a.clar); p.f1("uAHaze", a.haze)
             p.f1("uDepthOn", if (depthOn) 1f else 0f)
             p.i1("uDepth", 2)
         }

@@ -225,3 +225,18 @@ fun EffectGlyph(modifier: Modifier = Modifier) {
         drawCircle(Color(0x88FFB04A), m * 0.07f, Offset(c.x - m * 0.28f, c.y + m * 0.2f))
     }
 }
+
+/** Tre cursori: icona di REGOLA. */
+@Composable
+fun AdjustGlyph(on: Boolean, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val xs = listOf(0.3f, 0.65f, 0.45f)
+        for (i in 0 until 3) {
+            val y = h * (0.25f + 0.25f * i)
+            drawLine(C.Line, Offset(w * 0.1f, y), Offset(w * 0.9f, y), strokeWidth = 3f)
+            drawCircle(if (on) C.Amber else C.Text, minOf(w, h) * 0.09f, Offset(w * xs[i], y))
+        }
+    }
+}
