@@ -90,6 +90,7 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
     var focusPt by remember { mutableStateOf<Offset?>(null) }
     var focusUV by remember { mutableStateOf(0.5f to 0.5f) }
     val pending = remember { AtomicReference<Bitmap?>(null) }
+    val shotId = remember { java.util.concurrent.atomic.AtomicInteger(0) }
 
     val look = remember(ci, li, fi, front, ev, focusUV) {
         val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
@@ -124,7 +125,7 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
 
     fun fail() {
         main.post {
-            Toast.makeText(ctx, "Foto non salvata", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, "Foto non salvata: " + controller.lastError.ifEmpty { "errore sconosciuto" }, Toast.LENGTH_LONG).show()
             busy = false
         }
     }
@@ -136,6 +137,7 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         if (name != null && dep != null) DepthStore.save(ctx, name, dep)
         if (name != null && neg != null) controller.depthFor(ctx, name, neg)
         if (name == null) {
+            if (controller.lastError.isEmpty()) controller.lastError = "salvataggio nella memoria dell'app non riuscito"
             fail()
             return
         }
@@ -158,6 +160,13 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
             return
         }
         busy = true
+        val shotNo = shotId.incrementAndGet()
+        main.postDelayed({
+            if (busy && shotId.get() == shotNo) {
+                Toast.makeText(ctx, "Scatto bloccato: " + controller.lastError.ifEmpty { "la camera non risponde" }, Toast.LENGTH_LONG).show()
+                busy = false
+            }
+        }, 8000)
         val pairNow = halfPair
         controller.takePhoto(look, date && !pairNow) { bmp, neg, dep ->
             if (bmp == null) {

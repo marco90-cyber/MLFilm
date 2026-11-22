@@ -36,6 +36,7 @@ class CameraController {
     internal var imageCapture: ImageCapture? = null
     @Volatile internal var camera: Camera? = null
     @Volatile internal var hidden: HiddenCamera? = null
+    @Volatile var lastError: String = ""
 
     fun hasFlash(): Boolean = camera?.cameraInfo?.hasFlashUnit() == true
 
@@ -87,9 +88,11 @@ class CameraController {
     fun takePhoto(look: Look, dateStamp: Boolean, onResult: ShotCb) {
         val hc = hidden
         if (hc != null) {
+            lastError = ""
             hc.capture { bytes, rot ->
                 bg.execute {
-                    val bmp = try { if (bytes == null) null else decodeUpright(bytes, rot, 4096) } catch (e: Throwable) { null }
+                    if (bytes == null) lastError = "la lente (camera2) non ha restituito l'immagine"
+                    val bmp = try { if (bytes == null) null else decodeUpright(bytes, rot, 4096) } catch (e: Throwable) { lastError = "decodifica: ${e.message}"; null }
                     if (bmp == null) onResult(null, null, null) else develop(bmp, look, dateStamp, onResult)
                 }
             }
@@ -98,7 +101,9 @@ class CameraController {
         val ic = imageCapture
         val gl = glView
         val r = renderer
+        lastError = ""
         if (ic == null || gl == null || r == null) {
+            lastError = "anteprima non pronta (camera non ancora aperta)"
             onResult(null, null, null)
             return
         }
@@ -111,6 +116,7 @@ class CameraController {
                     buf.get(bytes)
                     decodeUpright(bytes, rot, 4096)
                 } catch (e: Throwable) {
+                    lastError = "decodifica: ${e.message}"
                     null
                 } finally {
                     image.close()
@@ -123,6 +129,7 @@ class CameraController {
             }
 
             override fun onError(exception: ImageCaptureException) {
+                lastError = "CameraX errore ${exception.imageCaptureError}: ${exception.message}"
                 onResult(null, null, null)
             }
         })
@@ -144,6 +151,7 @@ class CameraController {
             bmp.recycle()
             onResult(shown, o.toByteArray(), null)
         } catch (e: Throwable) {
+            lastError = "sviluppo: ${e.javaClass.simpleName} ${e.message}"
             onResult(null, null, null)
         }
     }
