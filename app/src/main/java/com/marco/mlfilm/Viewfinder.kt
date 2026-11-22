@@ -26,7 +26,7 @@ import androidx.lifecycle.LifecycleEventObserver
 
 /** Mirino: anteprima live della camera con l'effetto della combinazione scelta. */
 @Composable
-fun Viewfinder(look: Look, controller: CameraController, front: Boolean, flashMode: Int, modifier: Modifier = Modifier) {
+fun Viewfinder(look: Look, controller: CameraController, front: Boolean, flashMode: Int, lens: RealLens? = null, onLensFail: () -> Unit = {}, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val activity = ctx as ComponentActivity
     val main = remember { Handler(Looper.getMainLooper()) }
@@ -56,7 +56,11 @@ fun Viewfinder(look: Look, controller: CameraController, front: Boolean, flashMo
         val obs = LifecycleEventObserver { _, e ->
             when (e) {
                 Lifecycle.Event.ON_RESUME -> glView.onResume()
-                Lifecycle.Event.ON_PAUSE -> glView.onPause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    glView.onPause()
+                    controller.hidden?.close()
+                    controller.hidden = null
+                }
                 else -> {}
             }
         }
@@ -68,19 +72,35 @@ fun Viewfinder(look: Look, controller: CameraController, front: Boolean, flashMo
         }
     }
 
-    DisposableEffect(epoch, front) {
+    DisposableEffect(epoch, front, lens?.key) {
         if (epoch == 0) return@DisposableEffect onDispose { }
         val exec = ContextCompat.getMainExecutor(ctx)
         val future = ProcessCameraProvider.getInstance(ctx)
+        var hc: HiddenCamera? = null
+        val useCam2 = !front && lens != null && lens.cam2
         future.addListener({
             val provider = future.get()
+            if (useCam2) {
+                provider.unbindAll()
+                controller.camera = null
+                val h = HiddenCamera(activity, lens!!.id, lens.kind == LensProbe.MACRO)
+                hc = h
+                controller.hidden = h
+                h.open(renderer) { main.post { onLensFail() } }
+                return@addListener
+            }
+            controller.hidden = null
             val preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3).build()
             preview.setSurfaceProvider(exec) { req -> renderer.onSurfaceRequest(req, exec) }
             provider.unbindAll()
             val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-            controller.camera = provider.bindToLifecycle(activity, selector, preview, capture)
+            val cam = provider.bindToLifecycle(activity, selector, preview, capture)
+            controller.camera = cam
+            if (!front) runCatching { cam.cameraControl.setZoomRatio(lens?.zoom ?: 1f) }
         }, exec)
         onDispose {
+            hc?.close()
+            if (hc != null && controller.hidden === hc) controller.hidden = null
             runCatching { if (future.isDone) future.get().unbindAll() }
         }
     }

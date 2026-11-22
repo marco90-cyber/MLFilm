@@ -112,12 +112,13 @@ fun tryOpen(ctx: Context, id: String, done: (String) -> Unit) {
 }
 
 @Composable
-fun CameraListScreen(onBack: () -> Unit) {
+fun CameraListScreen(onBack: () -> Unit, onRescan: () -> Unit = {}) {
     val ctx = LocalContext.current
     val lines = remember { describeCameras(ctx) }
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.padding(16.dp).clickable { onBack() })
         Mono("CAMERE VISIBILI ALL'APP", color = C.Amber, size = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
+        Mono("[ CERCA DI NUOVO LE LENTI ]", color = C.Amber, size = 13.sp, modifier = Modifier.padding(horizontal = 16.dp).clickable { onRescan() })
         var res by remember { mutableStateOf("") }
         Mono("[ PROVA APERTURA ID 2 ]", color = C.Amber, size = 13.sp, modifier = Modifier.padding(16.dp).clickable { tryOpen(ctx, "2") { res = it } })
         if (res.isNotEmpty()) Mono(res, color = C.Text, size = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))

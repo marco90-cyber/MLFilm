@@ -63,7 +63,7 @@ private val FLASH_MODES = listOf(
 )
 
 @Composable
-fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}) {
+fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<RealLens> = emptyList()) {
     val ctx = LocalContext.current
     val prefs = remember { RollPrefs(ctx) }
     val controller = remember { CameraController() }
@@ -81,6 +81,9 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}) {
     var open by remember { mutableIntStateOf(-1) } // -1 chiuso, 0 camera, 1 obiettivo, 2 pellicola
     var pendingShown by remember { mutableStateOf(false) }
     var front by remember { mutableStateOf(false) }
+    var rl by remember {
+        mutableStateOf(lenses.firstOrNull { it.key == prefs.realLens } ?: lenses.firstOrNull { it.kind == LensProbe.MAIN } ?: lenses.firstOrNull())
+    }
     var flashIdx by remember { mutableIntStateOf(0) }
     var ev by remember { mutableFloatStateOf(0f) }
     var zoom by remember { mutableFloatStateOf(1f) }
@@ -223,7 +226,10 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}) {
             val w = if (byHeight < availW) byHeight else availW
             CameraBody(cam.id) {
                 Box(Modifier.width(w)) {
-                    Viewfinder(look, controller, front, FLASH_MODES[flashIdx].second, Modifier.fillMaxWidth())
+                    Viewfinder(look, controller, front, FLASH_MODES[flashIdx].second, rl, {
+                        Toast.makeText(ctx, "Lente non disponibile", Toast.LENGTH_SHORT).show()
+                        rl = lenses.firstOrNull { it.kind == LensProbe.MAIN } ?: lenses.firstOrNull { !it.cam2 }
+                    }, Modifier.fillMaxWidth())
 
                     // gesti: pizzico = zoom, tocco = messa a fuoco
                     Box(
@@ -272,6 +278,14 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}) {
                                 flashIdx = (flashIdx + 1) % FLASH_MODES.size
                             }
                         }
+                    }
+                    if (!front && lenses.isNotEmpty()) {
+                        LensBar(
+                            lenses, rl?.key,
+                            { rl = it; prefs.realLens = it.key },
+                            { Toast.makeText(ctx, "Lente non disponibile", Toast.LENGTH_SHORT).show() },
+                            Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        )
                     }
                     ExposureRuler(
                         ev, { ev = it },

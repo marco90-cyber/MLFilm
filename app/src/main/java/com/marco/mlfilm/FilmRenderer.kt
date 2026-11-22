@@ -99,6 +99,15 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
         drawQuad(prog)
     }
 
+    /** Superficie per una camera aperta con Camera2: stesso schermo di CameraX, rotazione data dal chiamante. */
+    fun cameraSurface(w: Int, h: Int, rot: Int): Surface? {
+        val tex = st ?: return null
+        tex.setDefaultBufferSize(w, h)
+        rotation = rot
+        srcAspect = if (rot % 180 == 0) w.toFloat() / h else h.toFloat() / w
+        return Surface(tex)
+    }
+
     /** La camera chiede una superficie su cui scrivere i fotogrammi. */
     fun onSurfaceRequest(request: SurfaceRequest, executor: Executor) {
         val tex = st

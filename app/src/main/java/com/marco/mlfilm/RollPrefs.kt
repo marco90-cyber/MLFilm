@@ -26,6 +26,10 @@ class RollPrefs(ctx: Context) {
         get() = sp.getInt("film", 4)
         set(v) { sp.edit().putInt("film", v).apply() }
 
+    var realLens: String
+        get() = sp.getString("rlens", "") ?: ""
+        set(v) { sp.edit().putString("rlens", v).apply() }
+
     var date: Boolean
         get() = sp.getBoolean("date", true)
         set(v) { sp.edit().putBoolean("date", v).apply() }

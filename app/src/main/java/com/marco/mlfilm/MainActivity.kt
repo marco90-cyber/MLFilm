@@ -61,6 +61,7 @@ private fun Root() {
     var viewer by remember { mutableStateOf<Uri?>(null) }
     var editing by remember { mutableStateOf<Uri?>(null) }
     var cams by remember { mutableStateOf(false) }
+    var lenses by remember { mutableStateOf(LensProbe.cached(ctx)) }
     BackHandler(enabled = album || viewer != null || editing != null || cams) {
         if (cams) cams = false else if (editing != null) editing = null else if (viewer != null) viewer = null else album = false
     }
@@ -68,11 +69,14 @@ private fun Root() {
     Box(Modifier.fillMaxSize().background(C.Bg)) {
         if (!granted) {
             Mono("SERVE IL PERMESSO CAMERA", color = C.Amber, size = 13.sp, modifier = Modifier.align(Alignment.Center))
+        } else if (lenses == null) {
+            Mono("RICERCA LENTI…", color = C.Amber, size = 13.sp, modifier = Modifier.align(Alignment.Center))
+            LaunchedEffect(Unit) { LensProbe.scan(ctx) { lenses = it } }
         } else {
             val v = viewer
             val e = editing
             if (cams) {
-                CameraListScreen { cams = false }
+                CameraListScreen({ cams = false }, { LensProbe.clear(ctx); lenses = null })
             } else if (e != null) {
                 EditorScreen(e, { editing = null }, { editing = null; viewer = null })
             } else if (v != null) {
@@ -80,7 +84,7 @@ private fun Root() {
             } else if (album) {
                 AlbumScreen { viewer = it }
             } else {
-                CameraScreen({ album = true }, { cams = true })
+                CameraScreen({ album = true }, { cams = true }, lenses ?: emptyList())
             }
         }
     }

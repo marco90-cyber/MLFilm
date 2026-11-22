@@ -35,6 +35,7 @@ class CameraController {
     internal var glView: GLSurfaceView? = null
     internal var imageCapture: ImageCapture? = null
     @Volatile internal var camera: Camera? = null
+    @Volatile internal var hidden: HiddenCamera? = null
 
     fun hasFlash(): Boolean = camera?.cameraInfo?.hasFlashUnit() == true
 
@@ -78,6 +79,16 @@ class CameraController {
 
     /** Scatta, applica l'effetto e restituisce la foto finita (su un thread in background) oppure null. */
     fun takePhoto(look: Look, dateStamp: Boolean, onResult: ShotCb) {
+        val hc = hidden
+        if (hc != null) {
+            hc.capture { bytes, rot ->
+                bg.execute {
+                    val bmp = try { if (bytes == null) null else decodeUpright(bytes, rot, 4096) } catch (e: Throwable) { null }
+                    if (bmp == null) onResult(null, null, null) else develop(bmp, look, dateStamp, onResult)
+                }
+            }
+            return
+        }
         val ic = imageCapture
         val gl = glView
         val r = renderer
