@@ -1,10 +1,8 @@
 package com.marco.mlfilm
 
-import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -54,34 +52,14 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-private fun displayName(ctx: Context, uri: Uri): String? = try {
-    if (uri.scheme == "file") uri.lastPathSegment?.substringBeforeLast('.') else ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-        if (it.moveToFirst()) it.getString(0)?.substringBeforeLast('.') else null
-    }
-} catch (_: Exception) {
-    null
-}
+/** Le foto arrivano sempre come copie nella cache dell'app (nome unico): il nome serve da chiave per la profondità. */
+private fun displayName(uri: Uri): String? = uri.lastPathSegment?.substringBeforeLast('.')
 
-/** Carica la sorgente da sviluppare: il negativo se esiste, altrimenti la foto stessa. */
-private fun loadSource(ctx: Context, uri: Uri, maxSide: Int): Bitmap? {
-    val name = displayName(ctx, uri)
-    val neg = name?.let { CameraController.negativeFile(ctx, it) }
-    fun decode(open: () -> java.io.InputStream?): Bitmap? {
-        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        open()?.use { BitmapFactory.decodeStream(it, null, o) }
-        var s = 1
-        while (maxOf(o.outWidth, o.outHeight) / s > maxSide) s *= 2
-        val d = BitmapFactory.Options().apply { inSampleSize = s }
-        return open()?.use { BitmapFactory.decodeStream(it, null, d) }
-    }
-    return if (neg != null) decode { neg.inputStream() } else decode { ctx.contentResolver.openInputStream(uri) }
-}
-
-/** Sviluppa di nuovo una foto dell'album con un'altra camera, obiettivo e pellicola. */
+/** Modifica una foto: camera, obiettivo, pellicola, apertura ed effetti, con anteprima live. */
 @Composable
-fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
+fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> Unit) {
     val ctx = LocalContext.current
-    val prefs = remember { RollPrefs(ctx) }
+    val prefs = remember { Prefs(ctx) }
     val proc = remember { GlProcessor() }
     DisposableEffect(Unit) { onDispose { proc.release() } }
     val scope = rememberCoroutineScope()
@@ -89,10 +67,7 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     var ci by remember { mutableIntStateOf(0) } // si parte da Smartphone (nessun effetto)
     var li by remember { mutableIntStateOf(0) }
     var fi by remember { mutableIntStateOf(prefs.film.coerceIn(0, FILMS.size - 1)) }
-    val hasNeg = remember(uri) {
-        displayName(ctx, uri)?.let { CameraController.negativeFile(ctx, it) } != null
-    }
-    var date by remember { mutableStateOf(hasNeg && prefs.date) }
+    var date by remember { mutableStateOf(prefs.date) }
     var open by remember { mutableIntStateOf(-1) } // 0 camera, 1 lente, 2 pellicola, 3 apertura
     var compare by remember { mutableStateOf(false) }
     val showBokeh = open == 3
@@ -117,9 +92,9 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     var mode by remember { mutableIntStateOf(0) } // 0 fuoco, 1 pennello nitido, 2 pennello sfocato
 
     val src by produceState<Bitmap?>(null, uri) {
-        value = withContext(Dispatchers.IO) { loadSource(ctx, uri, 1280) }
+        value = withContext(Dispatchers.IO) { PhotoIO.decode(ctx, uri, 1280) }
     }
-    // Senza negativo la foto è già sviluppata: si tiene il suo formato, senza ritagliarla di nuovo.
+    // La foto tiene il suo formato, senza ritagli.
     val look = run {
         val s = src
         val base = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
@@ -130,14 +105,14 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             shadow = Rgb(base.shadow.r - cs * 0.02f, base.shadow.g + cs * 0.015f, base.shadow.b + cs * 0.05f),
             high = Rgb(base.high.r + cs * 0.05f, base.high.g + cs * 0.02f, base.high.b - cs * 0.04f),
         )
-        if (hasNeg || s == null) l else l.copy(aspect = s.width.toFloat() / s.height)
+        if (s == null) l else l.copy(aspect = s.width.toFloat() / s.height)
     }
     val srcAspect = src?.let { it.width.toFloat() / it.height } ?: 1f
 
     // mappa di profondità: salvata col negativo, altrimenti calcolata ora
     LaunchedEffect(src) {
         val s = src ?: return@LaunchedEffect
-        val name = displayName(ctx, uri)
+        val name = displayName(uri)
         val d = withContext(Dispatchers.Default) {
             name?.let { DepthStore.load(ctx, it) }
                 ?: DepthEstimator.estimate(s)?.also { b -> name?.let { n -> DepthStore.save(ctx, n, DepthStore.toPng(b)) } }
@@ -174,39 +149,50 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     }
 
     val srcImg = remember(src) { src?.asImageBitmap() }
+
+    /** Sviluppa la foto alla massima risoluzione e la salva in Pictures/MLFilm; con [share] apre anche la condivisione. */
+    fun export(share: Boolean) {
+        if (saving) return
+        saving = true
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                val full = PhotoIO.decode(ctx, uri, 4096) ?: return@withContext null
+                val fullLook = look.copy(aspect = full.width.toFloat() / full.height)
+                val out = suspendCancellableCoroutine<Bitmap?> { cont ->
+                    proc.process(full, fullLook, 4096, if (fullLook.fNum > 0f) depth else null) { cont.resume(it) }
+                }
+                full.recycle()
+                if (out == null) return@withContext null
+                if (date) PhotoIO.stampDate(out)
+                val u = PhotoIO.saveToGallery(ctx, out)
+                out.recycle()
+                u
+            }
+            saving = false
+            if (saved == null) {
+                Toast.makeText(ctx, "Foto non salvata", Toast.LENGTH_SHORT).show()
+            } else if (share && saved.scheme == "content") {
+                val i = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/jpeg"
+                    putExtra(Intent.EXTRA_STREAM, saved)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                ctx.startActivity(Intent.createChooser(i, null))
+                onSaved()
+            } else {
+                Toast.makeText(ctx, "Salvata in Pictures/MLFilm", Toast.LENGTH_SHORT).show()
+                onSaved()
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onBack() })
-            Mono("MODIFICA", color = C.Dim, size = 13.sp)
+            Mono(counter ?: "MODIFICA", color = C.Dim, size = 13.sp)
             Mono(
                 if (saving) "..." else "SALVA", color = C.Amber, size = 13.sp,
-                modifier = Modifier.clickable(enabled = !saving) {
-                    saving = true
-                    scope.launch {
-                        val ok = withContext(Dispatchers.IO) {
-                            val full = loadSource(ctx, uri, 4096) ?: return@withContext false
-                            val fullLook = if (hasNeg) look else look.copy(aspect = full.width.toFloat() / full.height)
-                            val dp = depth
-                            val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-                                proc.process(full, fullLook, 4096, if (fullLook.fNum > 0f) dp else null) { cont.resume(it) }
-                            }
-                            full.recycle()
-                            if (out == null) return@withContext false
-                            if (date) CameraController.stampDate(out)
-                            val name = CameraController.saveToGallery(ctx, out)
-                            out.recycle()
-                            if (name != null) {
-                                val oldName = displayName(ctx, uri)
-                                val neg = oldName?.let { CameraController.negativeFile(ctx, it) }
-                                if (neg != null) CameraController.saveNegative(ctx, name, neg.readBytes())
-                                dp?.let { DepthStore.save(ctx, name, DepthStore.toPng(it)) }
-                            }
-                            name != null
-                        }
-                        saving = false
-                        if (ok) onSaved() else Toast.makeText(ctx, "Foto non salvata", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                modifier = Modifier.clickable(enabled = !saving) { export(false) }
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -297,10 +283,10 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             }
         } else {
             Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (!hasNeg) Mono("SENZA NEGATIVO · L'EFFETTO SI SOMMA", color = C.Dim, size = 9.sp)
-                Mono("TIENI PREMUTO SULLA FOTO = NEGATIVO", color = C.Dim, size = 9.sp)
+                Mono("TIENI PREMUTO SULLA FOTO = ORIGINALE", color = C.Dim, size = 9.sp)
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip("DATE", date) { date = !date }
+                    Chip("DATE", date) { date = !date; prefs.date = date }
+                    Chip("CONDIVIDI", false) { export(true) }
                 }
             }
         }

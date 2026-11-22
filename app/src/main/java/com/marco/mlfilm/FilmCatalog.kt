@@ -3,6 +3,7 @@ package com.marco.mlfilm
 // Generato da tools/make_luts.py: look di pellicola come LUT 3D 13x13x13.
 // Origine: raccolta Film-Luts (G'MIC film presets). Vedi assets/luts/NOTICE.txt.
 val FILMS: List<FilmSpec> = listOf(
+    FilmSpec("none", "Nessuna", "Nessuna", 0),
     FilmSpec("bw/agfa_apx_100", "Agfa Apx 100", "B&W", 100),
     FilmSpec("bw/agfa_apx_25", "Agfa Apx 25", "B&W", 25),
     FilmSpec("bw/fuji_neopan_1600", "Fuji Neopan 1600", "B&W", 1600),

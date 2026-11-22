@@ -69,8 +69,11 @@ data class FilmSpec(
     val family: String,
     val iso: Int,
 ) {
-    val lut: String get() = "luts/$id.png"
+    /** "Nessuna": foto com'è, senza LUT, grana né alone. */
+    val none: Boolean get() = id == "none"
+    val lut: String? get() = if (none) null else "luts/$id.png"
     val grain: Float get() {
+        if (none) return 0f
         val base = when (family) {
             "B&W" -> 0.075f
             "Slide" -> 0.03f
@@ -82,7 +85,7 @@ data class FilmSpec(
         val k = if (iso > 0) Math.sqrt(iso / 100.0).toFloat().coerceIn(0.6f, 2.4f) else 1f
         return base * k
     }
-    val halation: Float get() = if (family == "Vintage Neg" || family == "Instant") 0.12f else 0.05f
+    val halation: Float get() = if (none) 0f else if (family == "Vintage Neg" || family == "Instant") 0.12f else 0.05f
 }
 
 /** Tutti i parametri già combinati, pronti per lo shader. */

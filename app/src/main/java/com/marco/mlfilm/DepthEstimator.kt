@@ -79,9 +79,9 @@ object DepthEstimator {
     }
 }
 
-/** Mappe di profondità salvate accanto ai negativi. */
+/** Mappe di profondità delle foto aperte, tenute nella cache dell'app. */
 object DepthStore {
-    private fun dir(ctx: Context): File = File(ctx.filesDir, "depth").apply { mkdirs() }
+    private fun dir(ctx: Context): File = File(ctx.cacheDir, "depth").apply { mkdirs() }
 
     fun toPng(b: Bitmap): ByteArray = java.io.ByteArrayOutputStream().also { b.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
 
@@ -90,6 +90,10 @@ object DepthStore {
             File(dir(ctx), "$name.png").writeBytes(png)
         } catch (_: Exception) {
         }
+    }
+
+    fun cleanOld(ctx: Context, olderThan: Long) {
+        dir(ctx).listFiles()?.filter { it.lastModified() < olderThan }?.forEach { it.delete() }
     }
 
     fun file(ctx: Context, name: String): File? = File(dir(ctx), "$name.png").takeIf { it.exists() }

@@ -46,6 +46,7 @@ with open(KT,"w") as f:
     f.write("package com.marco.mlfilm\n\n// Generato da tools/make_luts.py: look di pellicola come LUT 3D 13x13x13.\n")
     f.write("// Origine: raccolta Film-Luts (G'MIC film presets). Vedi assets/luts/NOTICE.txt.\n")
     f.write("val FILMS: List<FilmSpec> = listOf(\n")
+    f.write('    FilmSpec("none", "Nessuna", "Nessuna", 0),\n')
     for id_,name,fam,iso in items:
         f.write(f'    FilmSpec("{id_}", "{name}", "{fam}", {iso}),\n')
     f.write(")\n")

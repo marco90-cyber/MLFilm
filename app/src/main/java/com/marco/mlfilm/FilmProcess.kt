@@ -89,7 +89,7 @@ class FilmProcess {
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             }
             val heavy = l.fNum > 0f
-            FilmRenderer.applyLook(p, lutTex, l, if (heavy) 44f else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
+            applyLook(p, lutTex, l, if (heavy) 44f else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
             if (heavy && ow.toLong() * oh > 3_000_000L) {
                 // a fasce, per non far scattare il watchdog della GPU
                 GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
@@ -139,5 +139,47 @@ class FilmProcess {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(aPos)
         GLES20.glDisableVertexAttribArray(aUv)
+    }
+
+    companion object {
+        fun applyLook(p: GlProgram, lut: LutTexture, l: Look, taps: Float, depthOn: Boolean, srcAspect: Float, outAspect: Float, rotCos: Float, rotSin: Float, flip: Float, seed: Float) {
+            p.f1("uFlip", flip)
+            p.f2("uRot", rotCos, rotSin)
+            p.f1("uSrcAspect", srcAspect)
+            p.f1("uOutAspect", outAspect)
+            p.f1("uZoom", l.zoom)
+            p.f1("uDist", l.dist)
+            p.f1("uCA", l.ca)
+            p.f1("uSoft", l.soft)
+            p.f1("uTilt", l.tilt)
+            p.f3("uGain", l.gain)
+            p.f3("uShadow", l.shadow)
+            p.f3("uHigh", l.high)
+            p.f1("uSat", l.sat)
+            p.f1("uCon", l.con)
+            p.f1("uBri", l.bri)
+            p.f1("uFade", l.fade)
+            p.f1("uVig", l.vig)
+            p.f1("uGrain", l.grain)
+            p.f1("uHal", l.halation)
+            p.f1("uSeed", seed)
+            p.f1("uLeak", l.leak)
+            p.f1("uMirror", if (l.mirror) 1f else 0f)
+            p.f2("uLeakPos", 0.92f, 0.08f)
+            lut.bind(p, l.lut)
+            p.f1("uBokeh", blurRadius(l.fNum))
+            p.f1("uFocusD", l.focusDepth)
+            p.f2("uFocusPt", l.fpU, 1f - l.fpV)
+            p.f1("uShape", l.shape.toFloat())
+            p.f1("uSwirl", l.swirl)
+            p.f1("uCat", l.cat)
+            p.f1("uBoost", 0.25f + l.halation)
+            p.f1("uTaps", taps)
+            p.f1("uFlare", l.flare)
+            p.f1("uStar", l.star)
+            p.f1("uApod", l.apod)
+            p.f1("uDepthOn", if (depthOn) 1f else 0f)
+            p.i1("uDepth", 2)
+        }
     }
 }
