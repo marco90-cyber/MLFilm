@@ -60,8 +60,9 @@ private fun Root() {
     var album by remember { mutableStateOf(false) }
     var viewer by remember { mutableStateOf<Uri?>(null) }
     var editing by remember { mutableStateOf<Uri?>(null) }
-    BackHandler(enabled = album || viewer != null || editing != null) {
-        if (editing != null) editing = null else if (viewer != null) viewer = null else album = false
+    var cams by remember { mutableStateOf(false) }
+    BackHandler(enabled = album || viewer != null || editing != null || cams) {
+        if (cams) cams = false else if (editing != null) editing = null else if (viewer != null) viewer = null else album = false
     }
 
     Box(Modifier.fillMaxSize().background(C.Bg)) {
@@ -70,14 +71,16 @@ private fun Root() {
         } else {
             val v = viewer
             val e = editing
-            if (e != null) {
+            if (cams) {
+                CameraListScreen { cams = false }
+            } else if (e != null) {
                 EditorScreen(e, { editing = null }, { editing = null; viewer = null })
             } else if (v != null) {
                 ViewerScreen(v, { viewer = null }, { editing = v })
             } else if (album) {
                 AlbumScreen { viewer = it }
             } else {
-                CameraScreen { album = true }
+                CameraScreen({ album = true }, { cams = true })
             }
         }
     }

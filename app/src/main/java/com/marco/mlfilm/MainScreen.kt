@@ -63,7 +63,7 @@ private val FLASH_MODES = listOf(
 )
 
 @Composable
-fun CameraScreen(onAlbum: () -> Unit) {
+fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}) {
     val ctx = LocalContext.current
     val prefs = remember { RollPrefs(ctx) }
     val controller = remember { CameraController() }
@@ -207,6 +207,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
             if (false) {
                 Chip(if (pair) "2-UP" else "1-UP", true) { pair = !pair; prefs.pair = pair }
             }
+            Chip("CAM", false) { onCams() }
             Chip("GRID", grid) { grid = !grid; prefs.grid = grid }
             Chip("DATE", date) { date = !date; prefs.date = date }
         }
