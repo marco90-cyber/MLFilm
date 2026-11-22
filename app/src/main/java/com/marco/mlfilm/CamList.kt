@@ -16,6 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import android.hardware.camera2.CameraDevice
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -92,6 +98,19 @@ fun describeCameras(ctx: Context): List<String> {
     return out
 }
 
+fun tryOpen(ctx: Context, id: String, done: (String) -> Unit) {
+    try {
+        val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        cm.openCamera(id, object : CameraDevice.StateCallback() {
+            override fun onOpened(d: CameraDevice) { d.close(); done("ID $id: APERTA OK") }
+            override fun onDisconnected(d: CameraDevice) { d.close(); done("ID $id: disconnessa") }
+            override fun onError(d: CameraDevice, e: Int) { d.close(); done("ID $id: ERRORE $e") }
+        }, Handler(Looper.getMainLooper()))
+    } catch (e: Exception) {
+        done("ID $id: ${e.javaClass.simpleName} ${e.message}")
+    }
+}
+
 @Composable
 fun CameraListScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
@@ -99,6 +118,9 @@ fun CameraListScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.padding(16.dp).clickable { onBack() })
         Mono("CAMERE VISIBILI ALL'APP", color = C.Amber, size = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
+        var res by remember { mutableStateOf("") }
+        Mono("[ PROVA APERTURA ID 2 ]", color = C.Amber, size = 13.sp, modifier = Modifier.padding(16.dp).clickable { tryOpen(ctx, "2") { res = it } })
+        if (res.isNotEmpty()) Mono(res, color = C.Text, size = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
             for (l in lines) Mono(if (l.isEmpty()) " " else l, color = C.Text, size = 11.sp)
         }
