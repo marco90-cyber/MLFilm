@@ -74,6 +74,7 @@ class CameraController {
         }
     }
     private val bg = Executors.newSingleThreadExecutor()
+    private val depthExec = Executors.newSingleThreadExecutor()
 
     /** Scatta, applica l'effetto e restituisce la foto finita (su un thread in background) oppure null. */
     fun takePhoto(look: Look, dateStamp: Boolean, onResult: ShotCb) {
@@ -114,38 +115,35 @@ class CameraController {
      * Applica l'effetto a una bitmap già in piedi (la bitmap passata viene riciclata).
      * Restituisce anche il "negativo": la foto senza effetto, per poterla sviluppare di nuovo dall'album.
      */
-    private fun develop(bmp: Bitmap, look: Look, dateStamp: Boolean, onResult: ShotCb) {
-        val gl = glView
-        val r = renderer
-        if (gl == null || r == null) {
+    private fun develop(bmp0: Bitmap, look: Look, dateStamp: Boolean, onResult: ShotCb) {
+        try {
+            val bmp = if (look.mirror) {
+                val m = Matrix().apply { preScale(-1f, 1f) }
+                Bitmap.createBitmap(bmp0, 0, 0, bmp0.width, bmp0.height, m, true).also { if (it !== bmp0) bmp0.recycle() }
+            } else bmp0
+            val o = java.io.ByteArrayOutputStream()
+            bmp.compress(Bitmap.CompressFormat.JPEG, 94, o)
+            val shown = negativeLook(bmp)
             bmp.recycle()
+            onResult(shown, o.toByteArray(), null)
+        } catch (e: Throwable) {
             onResult(null, null, null)
-            return
         }
-        // profondità (modello AI) prima del passaggio OpenGL; senza modello lo shader stima da solo
-        val depth = if (look.fNum > 0f) DepthEstimator.estimate(bmp) else null
-        val lk = if (depth != null) {
-            look.copy(focusDepth = DepthStore.focusDepth(depth, look, bmp.width.toFloat() / bmp.height, look.fpU, look.fpV))
-        } else look
-        val depPng = depth?.let { DepthStore.toPng(it) }
-        gl.queueEvent {
-            val out = try {
-                r.processBitmap(bmp, lk, depth)
-            } catch (e: Throwable) {
-                null
-            }
-            depth?.recycle()
-            bg.execute {
-                val neg = try {
-                    val o = java.io.ByteArrayOutputStream()
-                    bmp.compress(Bitmap.CompressFormat.JPEG, 92, o)
-                    o.toByteArray()
-                } catch (e: Throwable) {
-                    null
+    }
+
+    /** Calcola la profondità del negativo in background e la salva accanto ad esso. */
+    fun depthFor(ctx: Context, name: String, jpg: ByteArray) {
+        depthExec.execute {
+            try {
+                val o = BitmapFactory.Options().apply { inSampleSize = 4 }
+                val b = BitmapFactory.decodeByteArray(jpg, 0, jpg.size, o) ?: return@execute
+                val d = DepthEstimator.estimate(b)
+                b.recycle()
+                if (d != null) {
+                    DepthStore.save(ctx, name, DepthStore.toPng(d))
+                    d.recycle()
                 }
-                bmp.recycle()
-                if (out != null && dateStamp) stampDate(out)
-                onResult(out, neg, depPng)
+            } catch (_: Throwable) {
             }
         }
     }
@@ -202,6 +200,20 @@ class CameraController {
     }
 
     companion object {
+        /** L'aspetto di un negativo a colori ancora da sviluppare: colori invertiti su base arancione. */
+        fun negativeLook(src: Bitmap): Bitmap {
+            val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+            val cm = android.graphics.ColorMatrix(floatArrayOf(
+                -0.62f, 0f, 0f, 0f, 232f,
+                0f, -0.55f, 0f, 0f, 150f,
+                0f, 0f, -0.45f, 0f, 86f,
+                0f, 0f, 0f, 1f, 0f,
+            ))
+            val p = Paint().apply { colorFilter = android.graphics.ColorMatrixColorFilter(cm) }
+            Canvas(out).drawBitmap(src, 0f, 0f, p)
+            return out
+        }
+
         /** Due fotogrammi verticali affiancati, come una stampa half frame. */
         fun composePair(a: Bitmap, b: Bitmap): Bitmap {
             val gap = (a.width * 0.02f).toInt()

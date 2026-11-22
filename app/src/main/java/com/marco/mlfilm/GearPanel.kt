@@ -2,7 +2,17 @@ package com.marco.mlfilm
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -70,5 +81,74 @@ fun GearGrid(
                 }
             }
         }
+    }
+}
+
+/** Elenco delle pellicole: una riga per nome; tenendo premuto si vedono le varianti. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FilmPicker(selected: Int, onPick: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val groups = FILM_GROUPS
+    val selGroup = groups.indexOfFirst { selected in it.members }.coerceAtLeast(0)
+    val state = rememberLazyListState()
+    LaunchedEffect(Unit) { state.scrollToItem(maxOf(0, selGroup - 2)) }
+    var variants by remember { mutableStateOf<FilmGroup?>(null) }
+    Column(modifier.background(C.Panel)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Mono("PELLICOLA · TIENI PREMUTO = VARIANTI", size = 10.sp)
+            Mono("%d / %d".format(selGroup + 1, groups.size), color = C.Amber, size = 14.sp)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(C.Line))
+        LazyColumn(state = state, modifier = Modifier.fillMaxWidth()) {
+            itemsIndexed(groups) { i, gr ->
+                val sel = i == selGroup
+                val f = FILMS[if (sel) selected else gr.rep]
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(if (sel) Modifier.background(Color(0x22F5A623)) else Modifier)
+                        .combinedClickable(onClick = { onPick(gr.rep) }, onLongClick = { variants = gr })
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    FilmGlyph(f.family, Modifier.size(36.dp))
+                    Column(Modifier.weight(1f)) {
+                        androidx.compose.material3.Text(f.name, color = if (sel) C.Amber else C.Text, fontSize = 15.sp, maxLines = 1)
+                        Mono(f.family + if (f.iso > 0) " · ISO ${f.iso}" else "", color = C.Dim, size = 9.sp)
+                    }
+                    if (gr.members.size > 1) Mono("+${gr.members.size - 1}", color = C.Dim, size = 10.sp)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(C.Line))
+            }
+        }
+    }
+    variants?.let { gr ->
+        AlertDialog(
+            onDismissRequest = { variants = null },
+            containerColor = C.Panel,
+            confirmButton = {},
+            title = { Mono(gr.title.uppercase(), size = 12.sp) },
+            text = {
+                LazyColumn {
+                    itemsIndexed(gr.members) { _, idx ->
+                        val f = FILMS[idx]
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onPick(idx); variants = null }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            FilmGlyph(f.family, Modifier.size(28.dp))
+                            androidx.compose.material3.Text(f.name, color = if (idx == selected) C.Amber else C.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            Mono(f.family, color = C.Dim, size = 9.sp)
+                        }
+                    }
+                }
+            },
+        )
     }
 }

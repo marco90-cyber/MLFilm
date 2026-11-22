@@ -91,7 +91,9 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
         displayName(ctx, uri)?.let { CameraController.negativeFile(ctx, it) } != null
     }
     var date by remember { mutableStateOf(hasNeg && prefs.date) }
-    var open by remember { mutableIntStateOf(-1) }
+    var open by remember { mutableIntStateOf(-1) } // 0 camera, 1 lente, 2 pellicola, 3 apertura
+    var compare by remember { mutableStateOf(false) }
+    val showBokeh = open == 3
     var saving by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<ImageBitmap?>(null) }
     var ap by remember { mutableIntStateOf(nearestAperture(LENSES[li].f)) }
@@ -105,7 +107,6 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     var depth by remember { mutableStateOf<Bitmap?>(null) }
     var depthVer by remember { mutableIntStateOf(0) }
     var depthStatus by remember { mutableStateOf("CALCOLO...") }
-    var showBokeh by remember { mutableStateOf(false) }
     var mode by remember { mutableIntStateOf(0) } // 0 fuoco, 1 pennello nitido, 2 pennello sfocato
 
     val src by produceState<Bitmap?>(null, uri) {
@@ -160,6 +161,7 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
         if (out != null) preview = out.asImageBitmap()
     }
 
+    val srcImg = remember(src) { src?.asImageBitmap() }
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onBack() })
@@ -198,9 +200,16 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             preview?.let { pv ->
                 Image(
-                    pv, null,
+                    if (compare && srcImg != null) srcImg else pv, null,
                     Modifier.fillMaxSize().padding(horizontal = 12.dp).pointerInput(showBokeh, mode, depth != null, look) {
-                        if (!showBokeh) return@pointerInput
+                        if (!showBokeh) {
+                            detectTapGestures(onPress = {
+                                compare = true
+                                tryAwaitRelease()
+                                compare = false
+                            })
+                            return@pointerInput
+                        }
                         fun toUv(o: Offset): Pair<Float, Float>? {
                             val sc = minOf(size.width / pv.width.toFloat(), size.height / pv.height.toFloat())
                             val dw = pv.width * sc
@@ -231,18 +240,16 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             Slot("CAMERA", CAMERAS[ci].name, open == 0, false, { open = if (open == 0) -1 else 0 }) { CameraGlyph(CAMERAS[ci].id, it) }
             Slot("LENS", LENSES[li].name, open == 1, false, { open = if (open == 1) -1 else 1 }) { LensGlyph(LENSES[li], it) }
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
+            Slot("APERTURA", apertureLabel(APERTURES[ap]), open == 3, false, { open = if (open == 3) -1 else 3 }) { ApertureGlyph(APERTURES[ap], it) }
         }
         if (open >= 0) {
             val panel = Modifier.fillMaxWidth().height(280.dp)
             when (open) {
                 0 -> GearGrid("CAMERA", CAMERAS.size, ci, 4, { ci = it }, { CAMERAS[it].name }, panel) { i, m -> CameraGlyph(CAMERAS[i].id, m) }
                 1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it }, { LENSES[it].name }, panel) { i, m -> LensGlyph(LENSES[i], m) }
-                else -> GearGrid("FILM", FILMS.size, fi, 4, { fi = it }, { FILMS[it].name }, panel) { i, m -> FilmGlyph(FILMS[i].family, m) }
-            }
-        } else {
-            Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (!hasNeg) Mono("SENZA NEGATIVO · L'EFFETTO SI SOMMA", color = C.Dim, size = 9.sp)
-                if (showBokeh) {
+                2 -> FilmPicker(fi, { fi = it }, panel)
+                else -> Column(panel.background(C.Panel).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Mono("APERTURA · FORMA BOKEH · FUOCO", size = 11.sp)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Mono(apertureLabel(APERTURES[ap]), color = C.Amber, size = 12.sp, modifier = Modifier.padding(end = 8.dp))
                         Slider(
@@ -255,15 +262,19 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SHAPES.forEachIndexed { i, n -> Chip(n, sh == i) { sh = i } }
                     }
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Chip("FUOCO", mode == 0) { mode = 0 }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Chip("TOCCA = FUOCO", mode == 0) { mode = 0 }
                         Chip("NITIDO", mode == 1) { mode = 1 }
                         Chip("SFOCA", mode == 2) { mode = 2 }
-                        Mono("PROFONDITÀ: $depthStatus", color = C.Dim, size = 9.sp, modifier = Modifier.weight(1f))
                     }
+                    Mono("PROFONDITÀ: $depthStatus", color = C.Dim, size = 9.sp)
                 }
+            }
+        } else {
+            Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (!hasNeg) Mono("SENZA NEGATIVO · L'EFFETTO SI SOMMA", color = C.Dim, size = 9.sp)
+                Mono("TIENI PREMUTO SULLA FOTO = NEGATIVO", color = C.Dim, size = 9.sp)
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip("BOKEH", showBokeh) { showBokeh = !showBokeh }
                     Chip("DATE", date) { date = !date }
                 }
             }

@@ -192,3 +192,17 @@ val LENSES: List<LensSpec> = listOf(
     LensSpec("fish", "Fisheye 16 f8", 1.28f, f = 8f, dist = 0.95f, ca = 0.004f, vig = 0.15f),
     LensSpec("tilt", "Tilt-Shift f5.6", 1.35f, f = 5.6f, tilt = 1f),
 )
+
+private val FILM_SUFFIX = Regex(" (\\+\\+|\\+|\u2212)$")
+
+/** Una pellicola "madre" per nome, con le sue varianti (+, ++, −, altre categorie con lo stesso nome). */
+class FilmGroup(val title: String, val members: List<Int>, val rep: Int)
+
+val FILM_GROUPS: List<FilmGroup> by lazy {
+    val map = LinkedHashMap<String, MutableList<Int>>()
+    FILMS.forEachIndexed { i, f -> map.getOrPut(f.name.replace(FILM_SUFFIX, "").lowercase()) { mutableListOf() }.add(i) }
+    map.values.map { m ->
+        val rep = m.firstOrNull { FILMS[it].name == FILMS[it].name.replace(FILM_SUFFIX, "") } ?: m[0]
+        FilmGroup(FILMS[rep].name.replace(FILM_SUFFIX, ""), m, rep)
+    }
+}

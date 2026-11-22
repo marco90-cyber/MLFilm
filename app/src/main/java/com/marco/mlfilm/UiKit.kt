@@ -331,3 +331,23 @@ fun ExposureRuler(ev: Float, onChange: (Float) -> Unit, modifier: Modifier = Mod
         }
     }
 }
+
+/** Diaframma a lamelle: più aperto = foro più grande. */
+@Composable
+fun ApertureGlyph(f: Float, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val m = minOf(size.width, size.height)
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val r = m * 0.46f
+        drawCircle(Color(0xFF3A3A3A), r, c)
+        drawCircle(Color(0xFF151515), r * 0.92f, c)
+        val hole = if (f <= 0f) 0.15f else (0.62f - 0.045f * minOf(f, 11f)).coerceIn(0.14f, 0.6f)
+        for (i in 0 until 6) {
+            val a = Math.toRadians(i * 60.0 + 15.0)
+            val e = Offset(c.x + (r * 0.92f * Math.cos(a)).toFloat(), c.y + (r * 0.92f * Math.sin(a)).toFloat())
+            val s = Offset(c.x + (r * hole * Math.cos(a + 1.0)).toFloat(), c.y + (r * hole * Math.sin(a + 1.0)).toFloat())
+            drawLine(Color(0xFF5A5A5A), s, e, strokeWidth = m * 0.035f)
+        }
+        drawCircle(C.Amber, r * hole, c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = m * 0.03f))
+    }
+}

@@ -90,10 +90,10 @@ fun CameraScreen(onAlbum: () -> Unit) {
 
     val look = remember(ci, li, fi, front, ev, focusUV) {
         val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
-        l.copy(bri = l.bri + ev, mirror = front, fpU = focusUV.first, fpV = focusUV.second)
+        l.copy(bri = l.bri + ev, mirror = front, fNum = 0f, fpU = focusUV.first, fpV = focusUV.second)
     }
     val cam = CAMERAS[ci]
-    val halfPair = cam.half && pair
+    val halfPair = false // lo scatto salva solo il negativo: l'half frame si decide dopo
     val stampText = remember { SimpleDateFormat("''yy  MM  dd", Locale.US).format(Date()) }
 
     LaunchedEffect(ci, pair) {
@@ -131,6 +131,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
         out?.recycle()
         if (name != null && neg != null) CameraController.saveNegative(ctx, name, neg)
         if (name != null && dep != null) DepthStore.save(ctx, name, dep)
+        if (name != null && neg != null) controller.depthFor(ctx, name, neg)
         if (name == null) {
             fail()
             return
@@ -203,7 +204,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
                 Text("%02d".format(left), color = Color(0xFF2A2A2A), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
             Mono("ROLL %02d".format(roll), modifier = Modifier.weight(1f), size = 10.sp)
-            if (cam.half) {
+            if (false) {
                 Chip(if (pair) "2-UP" else "1-UP", true) { pair = !pair; prefs.pair = pair }
             }
             Chip("GRID", grid) { grid = !grid; prefs.grid = grid }
@@ -327,9 +328,7 @@ fun CameraScreen(onAlbum: () -> Unit) {
                 1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it; prefs.lens = it }, { LENSES[it].name }, panel) { i, m ->
                     LensGlyph(LENSES[i], m)
                 }
-                else -> GearGrid("FILM", FILMS.size, fi, 4, { fi = it; prefs.film = it }, { FILMS[it].name }, panel) { i, m ->
-                    FilmGlyph(FILMS[i].family, m)
-                }
+                else -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
             }
         }
     }
