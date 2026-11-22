@@ -163,7 +163,7 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         val shotNo = shotId.incrementAndGet()
         main.postDelayed({
             if (busy && shotId.get() == shotNo) {
-                Toast.makeText(ctx, "Scatto bloccato: " + controller.lastError.ifEmpty { "la camera non risponde" }, Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, "Scatto bloccato: " + controller.lastError.ifEmpty { "la camera non risponde (" + (if (controller.hidden != null) "Camera2" else "CameraX") + ")" }, Toast.LENGTH_LONG).show()
                 busy = false
             }
         }, 8000)

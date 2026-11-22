@@ -91,7 +91,7 @@ class CameraController {
             lastError = ""
             hc.capture { bytes, rot ->
                 bg.execute {
-                    if (bytes == null) lastError = "la lente (camera2) non ha restituito l'immagine"
+                    if (bytes == null) lastError = "lente Camera2: " + hc.error
                     val bmp = try { if (bytes == null) null else decodeUpright(bytes, rot, 4096) } catch (e: Throwable) { lastError = "decodifica: ${e.message}"; null }
                     if (bmp == null) onResult(null, null, null) else develop(bmp, look, dateStamp, onResult)
                 }
@@ -102,6 +102,11 @@ class CameraController {
         val gl = glView
         val r = renderer
         lastError = ""
+        if (camera == null) {
+            lastError = "nessuna camera attiva: riapri l'app o cambia lente"
+            onResult(null, null, null)
+            return
+        }
         if (ic == null || gl == null || r == null) {
             lastError = "anteprima non pronta (camera non ancora aperta)"
             onResult(null, null, null)

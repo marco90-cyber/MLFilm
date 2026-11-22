@@ -28,6 +28,7 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
     @Volatile var rotation = 90
         private set
     @Volatile private var closed = false
+    @Volatile var error = ""
     private var afMode = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
     private var previewReq: CaptureRequest.Builder? = null
     private var active: Rect? = null
@@ -160,30 +161,46 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
         }
     }
 
-    /** Scatta un JPEG: callback con i byte e la rotazione da applicare, oppure null. */
+    /** Scatta un JPEG: callback con i byte e la rotazione da applicare, oppure null (con [error] valorizzato). */
     fun capture(onJpeg: (ByteArray?, Int) -> Unit) {
+        error = ""
         val d = device
         val sess = session
         val r = reader
-        if (d == null || sess == null || r == null || closed) { onJpeg(null, 0); return }
+        if (d == null || sess == null || r == null || closed) {
+            error = "camera non ancora pronta (id $id)"
+            onJpeg(null, 0)
+            return
+        }
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun finish(b: ByteArray?, why: String) {
+            if (done.getAndSet(true)) return
+            if (b == null) error = why
+            onJpeg(b, rotation)
+        }
+        h.postDelayed({ finish(null, "nessun JPEG entro 6 secondi (id $id)") }, 6000)
         try {
             r.setOnImageAvailableListener({ rd ->
                 val img = try { rd.acquireLatestImage() } catch (e: Exception) { null }
-                if (img == null) { onJpeg(null, 0); return@setOnImageAvailableListener }
+                if (img == null) { finish(null, "immagine nulla"); return@setOnImageAvailableListener }
                 val bytes = try {
                     val b = img.planes[0].buffer
                     ByteArray(b.remaining()).also { b.get(it) }
                 } catch (e: Exception) { null } finally { img.close() }
-                onJpeg(bytes, rotation)
+                finish(bytes, "lettura JPEG fallita")
             }, h)
             val rq = d.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             rq.addTarget(r.surface)
             rq.set(CaptureRequest.CONTROL_AF_MODE, afMode)
             rq.set(CaptureRequest.JPEG_QUALITY, 95.toByte())
             applyTo(rq)
-            sess.capture(rq.build(), null, h)
+            sess.capture(rq.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureFailed(s: CameraCaptureSession, req: CaptureRequest, f: android.hardware.camera2.CaptureFailure) {
+                    finish(null, "scatto rifiutato dalla camera (motivo ${f.reason})")
+                }
+            }, h)
         } catch (e: Exception) {
-            onJpeg(null, 0)
+            finish(null, "${e.javaClass.simpleName} ${e.message}")
         }
     }
 
