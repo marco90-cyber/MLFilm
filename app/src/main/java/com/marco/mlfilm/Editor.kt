@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.ui.geometry.Offset
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -84,8 +86,8 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     DisposableEffect(Unit) { onDispose { proc.release() } }
     val scope = rememberCoroutineScope()
 
-    var ci by remember { mutableIntStateOf(prefs.cam.coerceIn(0, CAMERAS.size - 1)) }
-    var li by remember { mutableIntStateOf(prefs.lens.coerceIn(0, LENSES.size - 1)) }
+    var ci by remember { mutableIntStateOf(0) } // si parte da Smartphone (nessun effetto)
+    var li by remember { mutableIntStateOf(0) }
     var fi by remember { mutableIntStateOf(prefs.film.coerceIn(0, FILMS.size - 1)) }
     val hasNeg = remember(uri) {
         displayName(ctx, uri)?.let { CameraController.negativeFile(ctx, it) } != null
@@ -102,6 +104,11 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
         ap = nearestAperture(LENSES[li].f)
         sh = LENSES[li].shape
     }
+    var flare by remember { mutableStateOf(0f) }
+    var star by remember { mutableStateOf(0f) }
+    var sf by remember { mutableStateOf(0f) }
+    var cs by remember { mutableStateOf(0f) }
+    var apod by remember { mutableStateOf(0f) }
     var fd by remember { mutableStateOf(1f) }
     var fp by remember { mutableStateOf(0.5f to 0.5f) }
     var depth by remember { mutableStateOf<Bitmap?>(null) }
@@ -115,8 +122,13 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
     // Senza negativo la foto è già sviluppata: si tiene il suo formato, senza ritagliarla di nuovo.
     val look = run {
         val s = src
-        val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi]).copy(
+        val base = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
+        val l = base.copy(
             fNum = APERTURES[ap], shape = sh, focusDepth = fd, fpU = fp.first, fpV = fp.second,
+            flare = flare, star = star, apod = apod,
+            soft = base.soft + sf * 0.9f, halation = base.halation + sf * 0.35f,
+            shadow = Rgb(base.shadow.r - cs * 0.02f, base.shadow.g + cs * 0.015f, base.shadow.b + cs * 0.05f),
+            high = Rgb(base.high.r + cs * 0.05f, base.high.g + cs * 0.02f, base.high.b - cs * 0.04f),
         )
         if (hasNeg || s == null) l else l.copy(aspect = s.width.toFloat() / s.height)
     }
@@ -241,6 +253,7 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             Slot("LENS", LENSES[li].name, open == 1, false, { open = if (open == 1) -1 else 1 }) { LensGlyph(LENSES[li], it) }
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
             Slot("APERTURA", apertureLabel(APERTURES[ap]), open == 3, false, { open = if (open == 3) -1 else 3 }) { ApertureGlyph(APERTURES[ap], it) }
+            Slot("EFFETTI", if (flare + star + sf + apod > 0f || cs != 0f) "ON" else "OFF", open == 4, false, { open = if (open == 4) -1 else 4 }) { EffectGlyph(it) }
         }
         if (open >= 0) {
             val panel = Modifier.fillMaxWidth().height(280.dp)
@@ -248,6 +261,18 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                 0 -> GearGrid("CAMERA", CAMERAS.size, ci, 4, { ci = it }, { CAMERAS[it].name }, panel) { i, m -> CameraGlyph(CAMERAS[i].id, m) }
                 1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it }, { LENSES[it].name }, panel) { i, m -> LensGlyph(LENSES[i], m) }
                 2 -> FilmPicker(fi, { fi = it }, panel)
+                4 -> Column(
+                    panel.background(C.Panel).verticalScroll(rememberScrollState()).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Mono("EFFETTI DELL'OBIETTIVO", size = 11.sp)
+                    FxSlider("FLARE", flare, 0f..1f) { flare = it }
+                    FxSlider("STARBURST", star, 0f..1f) { star = it }
+                    FxSlider("SOFT FOCUS", sf, 0f..1f) { sf = it }
+                    FxSlider("COLORE", cs, -1f..1f) { cs = it }
+                    FxSlider("FUOCO SFUGGENTE", apod, 0f..1f) { apod = it }
+                    Mono("FLARE E STARBURST COMPAIONO SULLE LUCI FORTI", color = C.Dim, size = 9.sp)
+                }
                 else -> Column(panel.background(C.Panel).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Mono("APERTURA · FORMA BOKEH · FUOCO", size = 11.sp)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -279,5 +304,17 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FxSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Mono(label, color = if (value != 0f) C.Amber else C.Text, size = 10.sp, modifier = Modifier.width(110.dp))
+        Slider(
+            value = value, onValueChange = onChange, valueRange = range,
+            colors = SliderDefaults.colors(thumbColor = C.Amber, activeTrackColor = C.Amber, inactiveTrackColor = C.Line),
+            modifier = Modifier.weight(1f),
+        )
     }
 }

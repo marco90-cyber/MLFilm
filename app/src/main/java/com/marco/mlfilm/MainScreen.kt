@@ -69,8 +69,8 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
     val controller = remember { CameraController() }
     val main = remember { Handler(Looper.getMainLooper()) }
 
-    var ci by remember { mutableIntStateOf(prefs.cam.coerceIn(0, CAMERAS.size - 1)) }
-    var li by remember { mutableIntStateOf(prefs.lens.coerceIn(0, LENSES.size - 1)) }
+    val ci = 0 // allo scatto: camera e obiettivo neutri, restano solo le pellicole; il resto si sceglie nell'editor
+    val li = 0
     var fi by remember { mutableIntStateOf(prefs.film.coerceIn(0, FILMS.size - 1)) }
     var date by remember { mutableStateOf(prefs.date) }
     var pair by remember { mutableStateOf(prefs.pair) }
@@ -298,8 +298,6 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         // ---- ciak con i tre selettori
         ClapperStripe(Modifier.padding(horizontal = 12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel)) {
-            Slot("CAMERA", cam.name, open == 0, false, { open = if (open == 0) -1 else 0 }) { CameraGlyph(cam.id, it) }
-            Slot("LENS", LENSES[li].name, open == 1, false, { open = if (open == 1) -1 else 1 }) { LensGlyph(LENSES[li], it) }
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
         }
 
@@ -337,12 +335,6 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         } else {
             val panel = Modifier.fillMaxWidth().height(300.dp)
             when (open) {
-                0 -> GearGrid("CAMERA", CAMERAS.size, ci, 4, { ci = it; prefs.cam = it }, { CAMERAS[it].name }, panel) { i, m ->
-                    CameraGlyph(CAMERAS[i].id, m)
-                }
-                1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it; prefs.lens = it }, { LENSES[it].name }, panel) { i, m ->
-                    LensGlyph(LENSES[i], m)
-                }
                 else -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
             }
         }

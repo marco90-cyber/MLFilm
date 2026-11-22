@@ -8,3 +8,11 @@ Sono stati ridotti a 13x13x13 e salvati come strisce PNG con tools/make_luts.py.
 
 I nomi delle pellicole indicano il look emulato e appartengono ai rispettivi
 proprietari; sono usati solo a scopo descrittivo.
+
+----------------------------------------------------------------------
+Obiettivi: i valori di vignettatura, aberrazione cromatica e distorsione degli
+obiettivi (Gear.kt) sono ispirati ai dati del progetto Lensfun
+(https://lensfun.github.io, database di profili obiettivo, licenza
+Creative Commons Attribution-ShareAlike 3.0, CC BY-SA 3.0).
+Sono numeri arrotondati e riadattati, non copie del database.
+Flare e starburst sono generati dallo shader (nessuna texture esterna).

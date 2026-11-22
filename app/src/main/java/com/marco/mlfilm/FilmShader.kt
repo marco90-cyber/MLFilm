@@ -55,6 +55,9 @@ uniform float uSwirl;
 uniform float uCat;
 uniform float uBoost;
 uniform float uTaps;
+uniform float uFlare;
+uniform float uStar;
+uniform float uApod;
 
 float hash12(vec2 p);
 
@@ -103,12 +106,21 @@ float shapeR(float a) {
         float r = 2.0 - 2.0 * s + s * sqrt(abs(cos(t))) / (s + 1.4);
         return clamp(r / 3.0, 0.2, 1.15);
     }
-    return 0.5 + 0.5 * cos(5.0 * a);
+    if (uShape < 4.5) return 0.5 + 0.5 * cos(5.0 * a);
+    if (uShape < 5.5) {
+        float k = 3.14159265 / 8.0;
+        return cos(k) / cos(mod(a, 2.0 * k) - k);
+    }
+    if (uShape < 6.5) return 0.55 + 0.45 * cos(6.0 * a);
+    if (uShape < 7.5) return 1.0;
+    float t = a - 1.5707963;
+    return 0.62 + 0.5 * exp(-4.0 * (1.0 - cos(t)));
 }
 
 vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     float d0 = depthAt(c0, uv);
-    float coc0 = uBokeh * clamp(abs(d0 - uFocusD) * 1.7, 0.0, 1.0);
+    float fk = 1.7 - 1.0 * uApod;
+    float coc0 = uBokeh * clamp(abs(d0 - uFocusD) * fk, 0.0, 1.0);
     vec3 acc = col0;
     float wsum = 1.0;
     float jit = hash12(gl_FragCoord.xy + vec2(uSeed));
@@ -134,7 +146,7 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         vec2 suv = uv + p * uBokeh * vec2(1.0 / uOutAspect, 1.0);
         vec2 sc = toC(suv);
         float ds = depthAt(sc, suv);
-        float cocS = uBokeh * clamp(abs(ds - uFocusD) * 1.7, 0.0, 1.0);
+        float cocS = uBokeh * clamp(abs(ds - uFocusD) * fk, 0.0, 1.0);
         float w;
         if (ds >= d0 - 0.03) {
             w = smoothstep(dist - 0.002, dist + 0.002, max(cocS, coc0));
@@ -145,6 +157,8 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         vec3 sc3 = fetchC(sc);
         float lum = dot(sc3, vec3(0.299, 0.587, 0.114));
         w *= 1.0 + uBoost * smoothstep(0.72, 1.0, lum) * 6.0;
+        if (uShape > 6.5 && uShape < 7.5) w *= 0.15 + smoothstep(0.45, 0.72, r);
+        w *= 1.0 - uApod * 0.9 * r * r;
         acc += sc3 * w;
         wsum += w;
     }
@@ -198,6 +212,31 @@ void main() {
         col = mix(col, acc, clamp(rad * 70.0, 0.0, 0.85));
         vec3 glow = max(bl - vec3(0.62), vec3(0.0));
         col += glow * uHal * vec3(1.6, 0.9, 0.6);
+    }
+
+    if (uFlare > 0.0) {
+        vec3 gs = vec3(0.0);
+        for (int i = 0; i < 3; i++) {
+            float k = 0.45 + float(i) * 0.5;
+            vec3 sm = max(fetchC(-c * k) - vec3(0.7), vec3(0.0));
+            vec3 tint = i == 0 ? vec3(1.0, 0.45, 0.2) : (i == 1 ? vec3(0.3, 0.8, 0.6) : vec3(0.5, 0.4, 1.0));
+            gs += sm * tint;
+        }
+        col += gs * uFlare * 1.6;
+    }
+    if (uStar > 0.0) {
+        vec3 sp = vec3(0.0);
+        for (int d = 0; d < 4; d++) {
+            float a = float(d) * 0.785398 + 0.2;
+            vec2 dir = vec2(cos(a), sin(a));
+            for (int j = 1; j <= 6; j++) {
+                float t = float(j) / 6.0;
+                vec3 s1 = max(fetchC(c + dir * t * 0.14) - vec3(0.82), vec3(0.0));
+                vec3 s2 = max(fetchC(c - dir * t * 0.14) - vec3(0.82), vec3(0.0));
+                sp += (s1 + s2) * (1.0 - t) * (1.0 - t);
+            }
+        }
+        col += sp * uStar * 0.5;
     }
 
     col *= uGain * exp2(uBri);

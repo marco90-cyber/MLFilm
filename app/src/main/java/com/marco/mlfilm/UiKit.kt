@@ -351,3 +351,20 @@ fun ApertureGlyph(f: Float, modifier: Modifier = Modifier) {
         drawCircle(C.Amber, r * hole, c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = m * 0.03f))
     }
 }
+
+/** Icona degli effetti: stella di raggi con un riflesso. */
+@Composable
+fun EffectGlyph(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val m = minOf(size.width, size.height)
+        val c = Offset(size.width / 2f, size.height / 2f)
+        for (i in 0 until 4) {
+            val a = Math.toRadians(i * 45.0 + 10.0)
+            val dx = (m * 0.46f * Math.cos(a)).toFloat()
+            val dy = (m * 0.46f * Math.sin(a)).toFloat()
+            drawLine(Color(0xFF8A8A8A), Offset(c.x - dx, c.y - dy), Offset(c.x + dx, c.y + dy), strokeWidth = m * 0.03f)
+        }
+        drawCircle(C.Amber, m * 0.1f, c)
+        drawCircle(Color(0x88FFB04A), m * 0.07f, Offset(c.x - m * 0.28f, c.y + m * 0.2f))
+    }
+}

@@ -172,6 +172,9 @@ class FilmRenderer(private val onGlReady: () -> Unit) : GLSurfaceView.Renderer {
             p.f1("uCat", l.cat)
             p.f1("uBoost", 0.25f + l.halation)
             p.f1("uTaps", taps)
+            p.f1("uFlare", l.flare)
+            p.f1("uStar", l.star)
+            p.f1("uApod", l.apod)
             p.f1("uDepthOn", if (depthOn) 1f else 0f)
             p.i1("uDepth", 2)
         }
