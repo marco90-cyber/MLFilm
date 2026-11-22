@@ -8,7 +8,9 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.graphics.Rect
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.params.MeteringRectangle
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
@@ -27,6 +29,72 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
         private set
     @Volatile private var closed = false
     private var afMode = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+    private var previewReq: CaptureRequest.Builder? = null
+    private var active: Rect? = null
+    private var maxZoom = 1f
+    @Volatile var zoom = 1f
+        private set
+    private var focusRect: MeteringRectangle? = null
+
+    private fun crop(): Rect? {
+        val a = active ?: return null
+        if (zoom <= 1.001f) return a
+        val w = (a.width() / zoom).toInt()
+        val hh = (a.height() / zoom).toInt()
+        val x = a.left + (a.width() - w) / 2
+        val y = a.top + (a.height() - hh) / 2
+        return Rect(x, y, x + w, y + hh)
+    }
+
+    private fun applyTo(b: CaptureRequest.Builder) {
+        crop()?.let { b.set(CaptureRequest.SCALER_CROP_REGION, it) }
+        focusRect?.let {
+            b.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(it))
+            b.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(it))
+        }
+    }
+
+    private fun refresh() {
+        val b = previewReq ?: return
+        val s = session ?: return
+        try {
+            applyTo(b)
+            s.setRepeatingRequest(b.build(), null, h)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Pizzico: moltiplica lo zoom (digitale, ritaglio del sensore). */
+    fun zoomBy(f: Float) {
+        zoom = (zoom * f).coerceIn(1f, maxZoom)
+        h.post { refresh() }
+    }
+
+    /** Tocco: (px, py) da 0 a 1 nello spazio del sensore, origine in alto a sinistra. */
+    fun focusAt(px: Float, py: Float) {
+        h.post {
+            val a = active ?: return@post
+            val cr = crop() ?: a
+            val cx = cr.left + (px * cr.width()).toInt()
+            val cy = cr.top + (py * cr.height()).toInt()
+            val half = (a.width() * 0.06f).toInt()
+            val r = Rect(
+                (cx - half).coerceIn(a.left, a.right - 1), (cy - half).coerceIn(a.top, a.bottom - 1),
+                (cx + half).coerceIn(a.left + 1, a.right), (cy + half).coerceIn(a.top + 1, a.bottom),
+            )
+            focusRect = MeteringRectangle(r, MeteringRectangle.METERING_WEIGHT_MAX - 1)
+            val b = previewReq ?: return@post
+            val s = session ?: return@post
+            try {
+                applyTo(b)
+                b.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START)
+                s.capture(b.build(), null, h)
+                b.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_IDLE)
+                s.setRepeatingRequest(b.build(), null, h)
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     private fun pick(sizes: Array<Size>?, maxW: Int): Size? {
         if (sizes == null || sizes.isEmpty()) return null
@@ -40,6 +108,8 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
             val c = cm.getCameraCharacteristics(id)
             val map = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: run { onFail(); return }
             val sensor = c.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+            active = c.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+            maxZoom = minOf(c.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f, 8f)
             @Suppress("DEPRECATION")
             val disp = when (act.windowManager.defaultDisplay.rotation) {
                 Surface.ROTATION_90 -> 90
@@ -74,6 +144,7 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
                                     val rq = d.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                                     rq.addTarget(s)
                                     rq.set(CaptureRequest.CONTROL_AF_MODE, afMode)
+                                    previewReq = rq
                                     sess.setRepeatingRequest(rq.build(), null, h)
                                 } catch (e: Exception) { onFail() }
                             }
@@ -109,6 +180,7 @@ class HiddenCamera(private val act: Activity, private val id: String, private va
             rq.addTarget(r.surface)
             rq.set(CaptureRequest.CONTROL_AF_MODE, afMode)
             rq.set(CaptureRequest.JPEG_QUALITY, 95.toByte())
+            applyTo(rq)
             sess.capture(rq.build(), null, h)
         } catch (e: Exception) {
             onJpeg(null, 0)

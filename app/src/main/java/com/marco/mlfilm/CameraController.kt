@@ -39,10 +39,11 @@ class CameraController {
 
     fun hasFlash(): Boolean = camera?.cameraInfo?.hasFlashUnit() == true
 
-    fun zoomRatio(): Float = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
+    fun zoomRatio(): Float = hidden?.zoom ?: camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
 
     /** Pizzico con le dita: moltiplica lo zoom attuale. */
     fun zoomBy(factor: Float) {
+        hidden?.let { it.zoomBy(factor); return }
         val c = camera ?: return
         val st = c.cameraInfo.zoomState.value ?: return
         val r = (st.zoomRatio * factor).coerceIn(st.minZoomRatio, st.maxZoomRatio)
@@ -54,7 +55,8 @@ class CameraController {
      * seguendo gli stessi passaggi dello shader (ritaglio, zoom, rotazione) e chiede messa a fuoco ed esposizione.
      */
     fun focusAt(u: Float, v: Float, look: Look) {
-        val c = camera ?: return
+        val c = camera
+        if (c == null && hidden == null) return
         val r = renderer ?: return
         val srcA = r.srcAspect
         var cx = u - 0.5f
@@ -68,6 +70,10 @@ class CameraController {
         val by = (cx * Math.sin(th) + cy * Math.cos(th)).toFloat()
         val px = (bx + 0.5f).coerceIn(0f, 1f)
         val py = (0.5f - by).coerceIn(0f, 1f)
+        if (c == null) {
+            hidden?.focusAt(px, py)
+            return
+        }
         try {
             val pt = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(px, py)
             c.cameraControl.startFocusAndMetering(FocusMeteringAction.Builder(pt).build())
