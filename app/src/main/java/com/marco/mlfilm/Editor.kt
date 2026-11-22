@@ -540,7 +540,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                                 Mono("FORMA: " + SHAPES[sh.coerceIn(0, SHAPES.size - 1)], color = C.Dim, size = 9.sp)
                             }
                             else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                FocusBar(fd) { fd = it }
+                                FocusBar(fd, { fd = it })
                                 Mono("TRASCINA PER SCEGLIERE LA DISTANZA A FUOCO", color = C.Dim, size = 9.sp)
                                 Mono("O TOCCA LA FOTO PER METTERE A FUOCO COME SU UNA REFLEX", color = C.Dim, size = 9.sp)
                             }
