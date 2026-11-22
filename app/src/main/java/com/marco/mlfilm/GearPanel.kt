@@ -118,7 +118,7 @@ fun FilmPicker(selected: Int, onPick: (Int) -> Unit, modifier: Modifier = Modifi
         if (!ready) return@LaunchedEffect
         snapshotFlow {
             val info = state.layoutInfo
-            val mid = info.viewportSize.width / 2f
+            val mid = (info.viewportStartOffset + info.viewportEndOffset) / 2f
             info.visibleItemsInfo.minByOrNull { Math.abs(it.offset + it.size / 2f - mid) }?.index ?: -1
         }.collect { i ->
             if (i in FILMS.indices && i != shown) { shown = i; onPick(i) }
