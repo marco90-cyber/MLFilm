@@ -306,9 +306,8 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
 
     LaunchedEffect(src, look, depthVer) {
         val s = src ?: return@LaunchedEffect
-        delay(120)
         val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-            proc.process(s, look, 1280, if (look.fNum > 0f) depth else null) { cont.resume(it) }
+            proc.processLatest(s, look, 1280, if (look.fNum > 0f) depth else null) { if (cont.isActive) cont.resume(it) }
         }
         if (out != null) preview = out.asImageBitmap()
     }
