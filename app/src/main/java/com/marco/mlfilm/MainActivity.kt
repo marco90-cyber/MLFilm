@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,12 +23,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -78,9 +81,13 @@ private fun Root(incoming: List<Uri>, onIncomingTaken: () -> Unit) {
     var queue by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var refresh by remember { mutableIntStateOf(0) }
 
-    suspend fun enqueue(uris: List<Uri>) {
-        val copies = withContext(Dispatchers.IO) { uris.mapNotNull { PhotoIO.importToCache(ctx, it) } }
-        if (copies.isNotEmpty()) queue = copies
+    val scope = rememberCoroutineScope()
+    fun enqueue(uris: List<Uri>) {
+        scope.launch {
+            val copies = withContext(Dispatchers.IO) { uris.mapNotNull { PhotoIO.importToCache(ctx, it) } }
+            if (copies.isNotEmpty()) queue = copies
+            else Toast.makeText(ctx, "Impossibile aprire la foto", Toast.LENGTH_SHORT).show()
+        }
     }
 
     LaunchedEffect(incoming) {
@@ -88,15 +95,6 @@ private fun Root(incoming: List<Uri>, onIncomingTaken: () -> Unit) {
             val taken = incoming
             onIncomingTaken()
             enqueue(taken)
-        }
-    }
-
-    var pending by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    LaunchedEffect(pending) {
-        if (pending.isNotEmpty()) {
-            val p = pending
-            pending = emptyList()
-            enqueue(p)
         }
     }
 
@@ -115,7 +113,7 @@ private fun Root(incoming: List<Uri>, onIncomingTaken: () -> Unit) {
                 )
             }
         } else {
-            HomeScreen(refresh, { pending = it }, { pending = listOf(it) })
+            HomeScreen(refresh, { enqueue(it) }, { enqueue(listOf(it)) })
         }
     }
 }
