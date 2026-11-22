@@ -55,7 +55,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
 private fun displayName(ctx: Context, uri: Uri): String? = try {
-    ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+    if (uri.scheme == "file") uri.lastPathSegment?.substringBeforeLast('.') else ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0)?.substringBeforeLast('.') else null
     }
 } catch (_: Exception) {

@@ -42,9 +42,16 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Legge dalla galleria le foto scattate con MLFilm, dalla più recente. */
+/** Negativi dentro l'app e foto sviluppate nella galleria, dalla più recente. */
 fun loadShots(ctx: Context): List<Uri> {
-    val out = ArrayList<Uri>()
+    val all = ArrayList<Pair<Long, Uri>>()
+    for (f in CameraController.listShots(ctx)) all += f.lastModified() to Uri.fromFile(f)
+    for ((t, u) in loadDeveloped(ctx)) all += t to u
+    return all.sortedByDescending { it.first }.map { it.second }
+}
+
+private fun loadDeveloped(ctx: Context): List<Pair<Long, Uri>> {
+    val out = ArrayList<Pair<Long, Uri>>()
     val base = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
     val sel: String
     val args: Array<String>
@@ -58,11 +65,12 @@ fun loadShots(ctx: Context): List<Uri> {
     }
     try {
         ctx.contentResolver.query(
-            base, arrayOf(MediaStore.Images.Media._ID), sel, args,
+            base, arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_ADDED), sel, args,
             MediaStore.Images.Media.DATE_ADDED + " DESC"
         )?.use { c ->
             val idx = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            while (c.moveToNext()) out += Uri.withAppendedPath(base, c.getLong(idx).toString())
+            val di = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            while (c.moveToNext()) out += (c.getLong(di) * 1000L) to Uri.withAppendedPath(base, c.getLong(idx).toString())
         }
     } catch (_: Exception) {
     }
@@ -71,7 +79,7 @@ fun loadShots(ctx: Context): List<Uri> {
 
 private suspend fun loadBitmap(ctx: Context, uri: Uri, px: Int): Bitmap? = withContext(Dispatchers.IO) {
     try {
-        if (Build.VERSION.SDK_INT >= 29 && px <= 600) {
+        if (Build.VERSION.SDK_INT >= 29 && px <= 600 && uri.scheme != "file") {
             ctx.contentResolver.loadThumbnail(uri, Size(px, px), null)
         } else {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -135,8 +143,15 @@ fun ViewerScreen(uri: Uri, onBack: () -> Unit, onEdit: () -> Unit) {
     Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Mono("< INDIETRO", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onBack() })
-            Mono("MODIFICA", color = C.Text, size = 13.sp, modifier = Modifier.clickable { onEdit() })
-            Mono(
+            val isNeg = uri.scheme == "file"
+            Mono(if (isNeg) "SVILUPPA" else "MODIFICA", color = if (isNeg) C.Amber else C.Text, size = 13.sp, modifier = Modifier.clickable { onEdit() })
+            if (isNeg) Mono(
+                "ELIMINA", color = C.Text, size = 13.sp,
+                modifier = Modifier.clickable {
+                    uri.lastPathSegment?.substringBeforeLast('.')?.let { CameraController.deleteShot(ctx, it) }
+                    onBack()
+                }
+            ) else Mono(
                 "CONDIVIDI", color = C.Amber, size = 13.sp,
                 modifier = Modifier.clickable {
                     val i = Intent(Intent.ACTION_SEND).apply {

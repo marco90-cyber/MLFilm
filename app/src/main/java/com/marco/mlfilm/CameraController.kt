@@ -302,6 +302,30 @@ class CameraController {
             }
         }
 
+        private fun shotDir(ctx: Context): File = File(ctx.filesDir, "shots").apply { mkdirs() }
+
+        /** Il negativo da sviluppare resta dentro l'app (non va nella galleria del telefono). Restituisce il nome. */
+        fun saveShot(ctx: Context, bmp: Bitmap): String? {
+            val name = "MLFilm_" + SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+            return try {
+                FileOutputStream(File(shotDir(ctx), "$name.jpg")).use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                name
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /** Negativi dentro l'app, dal più recente: (file, data). */
+        fun listShots(ctx: Context): List<File> =
+            (shotDir(ctx).listFiles { f -> f.extension == "jpg" } ?: emptyArray()).sortedByDescending { it.lastModified() }
+
+        /** Elimina un negativo e i suoi file collegati. */
+        fun deleteShot(ctx: Context, name: String) {
+            runCatching { File(shotDir(ctx), "$name.jpg").delete() }
+            runCatching { File(negDir(ctx), "$name.jpg").delete() }
+            runCatching { DepthStore.file(ctx, name)?.delete() }
+        }
+
         private fun negDir(ctx: Context): File = File(ctx.filesDir, "negatives").apply { mkdirs() }
 
         /** Conserva il negativo (foto senza effetto) accanto alla foto salvata. */

@@ -130,7 +130,7 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
     }
 
     fun finish(out: Bitmap?, neg: ByteArray?, dep: ByteArray?, consumePose: Boolean) {
-        val name = if (out != null) CameraController.saveToGallery(ctx, out) else null
+        val name = if (out != null) CameraController.saveShot(ctx, out) else null
         out?.recycle()
         if (name != null && neg != null) CameraController.saveNegative(ctx, name, neg)
         if (name != null && dep != null) DepthStore.save(ctx, name, dep)
@@ -279,14 +279,6 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
                             }
                         }
                     }
-                    if (!front && lenses.isNotEmpty()) {
-                        LensBar(
-                            lenses, rl?.key,
-                            { rl = it; prefs.realLens = it.key },
-                            { Toast.makeText(ctx, "Lente non disponibile", Toast.LENGTH_SHORT).show() },
-                            Modifier.align(Alignment.TopEnd).padding(8.dp),
-                        )
-                    }
                     ExposureRuler(
                         ev, { ev = it },
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.42f).padding(bottom = 6.dp)
@@ -299,6 +291,10 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         ClapperStripe(Modifier.padding(horizontal = 12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel)) {
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
+            Slot(
+                "LENTE", if (front) "FRONTALE" else (rl?.name ?: "—"), open == 1, false,
+                { if (!front && lenses.isNotEmpty()) open = if (open == 1) -1 else 1 },
+            ) { LensGlyph(LensSpec("r", "", when (rl?.kind) { LensProbe.UW -> 0.8f; LensProbe.TELE -> 3f; LensProbe.MACRO -> 1.6f; else -> 1.4f }), it) }
         }
 
         if (open < 0) {
@@ -335,6 +331,12 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         } else {
             val panel = Modifier.fillMaxWidth().height(300.dp)
             when (open) {
+                1 -> LensList(
+                    lenses, rl?.key,
+                    { rl = it; prefs.realLens = it.key; open = -1 },
+                    { Toast.makeText(ctx, "Lente non disponibile", Toast.LENGTH_SHORT).show() },
+                    panel,
+                )
                 else -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
             }
         }
