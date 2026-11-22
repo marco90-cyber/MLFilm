@@ -178,6 +178,8 @@ class FilmProcess {
             p.f1("uFlare", l.flare)
             p.f1("uStar", l.star)
             p.f1("uApod", l.apod)
+            p.f1("uBokHi", l.hi)
+            p.f1("uBokViv", l.viv)
             p.f1("uDepthOn", if (depthOn) 1f else 0f)
             p.i1("uDepth", 2)
         }

@@ -58,6 +58,8 @@ uniform float uTaps;
 uniform float uFlare;
 uniform float uStar;
 uniform float uApod;
+uniform float uBokHi;
+uniform float uBokViv;
 
 float hash12(vec2 p);
 
@@ -113,6 +115,14 @@ float shapeR(float a) {
     }
     if (uShape < 6.5) return 0.55 + 0.45 * cos(6.0 * a);
     if (uShape < 7.5) return 1.0;
+    if (uShape > 8.5) {
+        if (uShape < 9.5) return 1.0;
+        if (uShape < 10.5) return 0.55 + 0.45 * abs(cos(2.5 * a));
+        if (uShape < 11.5) return 0.6 + 0.4 * abs(cos(2.0 * a));
+        float k4 = 3.14159265 / 4.0;
+        float a4 = (uShape < 12.5) ? a : a + k4;
+        return cos(k4) / cos(mod(a4, 2.0 * k4) - k4);
+    }
     float t = a - 1.5707963;
     return 0.62 + 0.5 * exp(-4.0 * (1.0 - cos(t)));
 }
@@ -156,8 +166,11 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         if (w <= 0.0) continue;
         vec3 sc3 = fetchC(sc);
         float lum = dot(sc3, vec3(0.299, 0.587, 0.114));
+        sc3 = clamp(mix(vec3(lum), sc3, 1.0 + uBokViv * 1.5), 0.0, 1.0);
         w *= 1.0 + uBoost * smoothstep(0.72, 1.0, lum) * 6.0;
+        w *= 1.0 + uBokHi * smoothstep(0.55, 1.0, lum) * 10.0;
         if (uShape > 6.5 && uShape < 7.5) w *= 0.15 + smoothstep(0.45, 0.72, r);
+        if (uShape > 8.5 && uShape < 9.5) w *= exp(-2.5 * r * r);
         w *= 1.0 - uApod * 0.9 * r * r;
         acc += sc3 * w;
         wsum += w;

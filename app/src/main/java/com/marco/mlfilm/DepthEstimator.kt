@@ -36,30 +36,47 @@ object DepthEstimator {
         }
     }
 
-    /** Un solo calcolo alla volta (l'Interpreter non è thread-safe). Chiamare fuori dal thread principale e da quello GL. */
+    /** Passa un'immagine al modello e restituisce la mappa grezza s*s (valori alti = vicino). */
+    private fun runModel(it: Interpreter, src: Bitmap, s: Int): FloatArray {
+        val sc = Bitmap.createScaledBitmap(src, s, s, true)
+        val px = IntArray(s * s)
+        sc.getPixels(px, 0, s, 0, 0, s, s)
+        if (sc !== src) sc.recycle()
+        val inp = ByteBuffer.allocateDirect(s * s * 3 * 4).order(ByteOrder.nativeOrder())
+        val fb = inp.asFloatBuffer()
+        for (p in px) {
+            fb.put(((p shr 16) and 255) / 255f)
+            fb.put(((p shr 8) and 255) / 255f)
+            fb.put((p and 255) / 255f)
+        }
+        inp.rewind()
+        val out = ByteBuffer.allocateDirect(s * s * 4).order(ByteOrder.nativeOrder())
+        it.run(inp, out)
+        out.rewind()
+        val d = FloatArray(s * s)
+        out.asFloatBuffer().get(d)
+        return d
+    }
+
+    /**
+     * Un solo calcolo alla volta (l'Interpreter non è thread-safe). Chiamare fuori dal thread principale e da quello GL.
+     * Con [extreme] la mappa è la media tra la foto e la sua versione specchiata: più stabile sui bordi, ma il doppio del tempo.
+     */
     @Synchronized
-    fun estimate(src: Bitmap): Bitmap? {
+    fun estimate(src: Bitmap, extreme: Boolean = false): Bitmap? {
         val it = get() ?: return null
         return try {
-            val shape = it.getInputTensor(0).shape() // 1, S, S, 3
-            val s = shape[1]
-            val sc = Bitmap.createScaledBitmap(src, s, s, true)
-            val px = IntArray(s * s)
-            sc.getPixels(px, 0, s, 0, 0, s, s)
-            if (sc !== src) sc.recycle()
-            val inp = ByteBuffer.allocateDirect(s * s * 3 * 4).order(ByteOrder.nativeOrder())
-            val fb = inp.asFloatBuffer()
-            for (p in px) {
-                fb.put(((p shr 16) and 255) / 255f)
-                fb.put(((p shr 8) and 255) / 255f)
-                fb.put((p and 255) / 255f)
+            val s = it.getInputTensor(0).shape()[1] // 1, S, S, 3
+            val d = runModel(it, src, s)
+            if (extreme) {
+                val m = android.graphics.Matrix().apply { preScale(-1f, 1f) }
+                val mir = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
+                val d2 = runModel(it, mir, s)
+                if (mir !== src) mir.recycle()
+                for (y in 0 until s) for (x in 0 until s) {
+                    d[y * s + x] = (d[y * s + x] + d2[y * s + (s - 1 - x)]) * 0.5f
+                }
             }
-            inp.rewind()
-            val out = ByteBuffer.allocateDirect(s * s * 4).order(ByteOrder.nativeOrder())
-            it.run(inp, out)
-            out.rewind()
-            val d = FloatArray(s * s)
-            out.asFloatBuffer().get(d)
             val sorted = d.copyOf().also { a -> a.sort() }
             val lo = sorted[(sorted.size * 0.02f).toInt()]
             val hi = sorted[(sorted.size * 0.98f).toInt()]

@@ -45,7 +45,10 @@ data class LensSpec(
     val tilt: Float = 0f,
 )
 
-val SHAPES = listOf("CERCHIO", "ESAGONO", "PENTAGONO", "CUORE", "STELLA", "OTTAGONO", "STELLA 6", "ANELLO", "GOCCIA")
+val SHAPES = listOf("CERCHIO", "ESAGONO", "PENTAGONO", "CUORE", "STELLA", "OTTAGONO", "STELLA 6", "ANELLO", "GOCCIA", "SOFT", "FIORE", "TRIFOGLIO", "ROMBO", "QUADRATO")
+
+/** Ordine delle forme nel selettore (indici di SHAPES). */
+val SHAPE_ORDER = listOf(0, 9, 10, 11, 8, 12, 13, 2, 1, 5, 3, 4, 6, 7)
 
 /** Stop di diaframma offerti dall'editor; l'ultimo (0) spegne la sfocatura. */
 val APERTURES = floatArrayOf(1.4f, 1.8f, 2f, 2.8f, 4f, 5.6f, 8f, 11f, 16f, 0f)
@@ -119,6 +122,8 @@ data class Look(
     val fpV: Float = 0.5f,
     val flare: Float = 0f,       // riflessi (ghost) dalle luci forti
     val star: Float = 0f,        // raggi attorno alle luci forti
+    val hi: Float = 0f,          // luminosità delle luci sfocate (bokeh), 0..1
+    val viv: Float = 0f,         // colore delle luci sfocate (bokeh), 0..1
     val apod: Float = 0f,        // bokeh morbido e passaggio di fuoco graduale ("fuoco sfuggente")
 )
 
