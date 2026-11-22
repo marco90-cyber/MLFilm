@@ -311,6 +311,27 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     }
 
     val srcImg = remember(src) { src?.asImageBitmap() }
+    // mirino "focus peaking": le zone a fuoco (profondità vicina a fd) si tingono d'ambra mentre si trascina la barra
+    val peakOn = ap > 0f && !compare && open == 3 && tab == 4 && depth != null
+    val peak by produceState<ImageBitmap?>(null, depthVer, fd, peakOn) {
+        val d = depth
+        if (!peakOn || d == null) { value = null; return@produceState }
+        value = withContext(Dispatchers.Default) {
+            val w = 160
+            val h = (w * d.height / d.width.toFloat()).toInt().coerceAtLeast(1)
+            val sm = Bitmap.createScaledBitmap(d, w, h, true)
+            val px = IntArray(w * h)
+            sm.getPixels(px, 0, w, 0, 0, w, h)
+            for (i in px.indices) {
+                val g = (px[i] and 0xFF) / 255f
+                val a = (1f - Math.abs(g - fd) / 0.1f).coerceIn(0f, 1f)
+                px[i] = ((a * 170f).toInt() shl 24) or 0xF5A623
+            }
+            val o = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+            if (sm !== d) sm.recycle()
+            o.asImageBitmap()
+        }
+    }
     val mapImg = remember(depthVer, showMap, depth) { if (showMap) depth?.asImageBitmap() else null }
 
     /** Sviluppa la foto alla massima risoluzione e la salva in Pictures/MLFilm; con [share] apre anche la condivisione. */
@@ -407,6 +428,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                             Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
                         )
                     }
+                    peak?.let { Image(it, null, Modifier.aspectRatio(srcAspect), contentScale = ContentScale.FillBounds) }
                     if (ap > 0f && !compare && (reticle || (open == 3 && tab == 4))) {
                         Canvas(Modifier.fillMaxSize()) {
                             val sc = minOf(size.width / pv.width.toFloat(), size.height / pv.height.toFloat())
@@ -486,7 +508,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
             Slot("LENS", LENSES[li].name, open == 1, false, { open = if (open == 1) -1 else 1 }) { LensGlyph(LENSES[li], it) }
             Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
             Slot("APERTURA", fmtF(ap), open == 3, false, { open = if (open == 3) -1 else 3 }) { ApertureGlyph(ap, it) }
-            Slot("EFFETTI", if (flare + star + sf + apod > 0f || cs != 0f) "ON" else "OFF", open == 4, false, { open = if (open == 4) -1 else 4 }) { EffectGlyph(it) }
+            Slot("EFFETTI", if (flare + star + sf + apod > 0.01f || Math.abs(cs) > 0.01f) "ON" else "OFF", open == 4, false, { open = if (open == 4) -1 else 4 }) { EffectGlyph(it) }
         }
         if (open >= 0) {
             val panel = Modifier.fillMaxWidth().height(280.dp)
@@ -509,7 +531,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                     FxSlider("SOFT FOCUS", sf, 0f..1f) { sf = it }
                     FxSlider("COLORE", cs, -1f..1f) { cs = it }
                     FxSlider("FUOCO SFUGGENTE", apod, 0f..1f) { apod = it }
-                    Mono("FLARE E STARBURST COMPAIONO SULLE LUCI FORTI", color = C.Dim, size = 9.sp)
+                    Mono("TOCCA UN NOME PER AZZERARLO \u00b7 FLARE E STARBURST SULLE LUCI FORTI", color = C.Dim, size = 9.sp)
                 }
                 else -> Column(panel.background(C.Panel)) {
                     Row(
@@ -566,7 +588,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                             }
                             else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 FocusBar(fd, { fd = it })
-                                Mono("TRASCINA PER SCEGLIERE LA DISTANZA A FUOCO", color = C.Dim, size = 9.sp)
+                                Mono("TRASCINA: LE ZONE AMBRA SULLA FOTO SONO A FUOCO", color = C.Dim, size = 9.sp)
                                 Mono("O TOCCA LA FOTO PER METTERE A FUOCO COME SU UNA REFLEX", color = C.Dim, size = 9.sp)
                             }
                         }
@@ -614,9 +636,14 @@ private fun PctSlider(label: String, value: Float, onChange: (Float) -> Unit) {
 @Composable
 private fun FxSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Mono(label, color = if (value != 0f) C.Amber else C.Text, size = 10.sp, modifier = Modifier.width(110.dp))
+        Mono(
+            if (value != 0f) "$label \u00d7" else label, color = if (value != 0f) C.Amber else C.Text, size = 10.sp,
+            modifier = Modifier.width(110.dp).clickable { onChange(0f) },
+        )
         Slider(
-            value = value, onValueChange = onChange, valueRange = range,
+            value = value,
+            onValueChange = { v -> onChange(if (Math.abs(v) < 0.04f) 0f else v) },   // vicino allo zero si aggancia a 0 (= spento)
+            valueRange = range,
             colors = SliderDefaults.colors(thumbColor = C.Amber, activeTrackColor = C.Amber, inactiveTrackColor = C.Line),
             modifier = Modifier.weight(1f),
         )
