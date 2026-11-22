@@ -92,9 +92,9 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
     val pending = remember { AtomicReference<Bitmap?>(null) }
     val shotId = remember { java.util.concurrent.atomic.AtomicInteger(0) }
 
-    val look = remember(ci, li, fi, front, ev, focusUV) {
-        val l = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
-        l.copy(bri = l.bri + ev, mirror = front, fNum = 0f, fpU = focusUV.first, fpV = focusUV.second)
+    // allo scatto nessun filtro: anteprima pulita, la pellicola si sceglie quando si sviluppa
+    val look = remember(front, ev, focusUV) {
+        Look(aspect = 0.75f, bri = ev, mirror = front, fNum = 0f, fpU = focusUV.first, fpV = focusUV.second)
     }
     val cam = CAMERAS[ci]
     val halfPair = false // lo scatto salva solo il negativo: l'half frame si decide dopo
@@ -299,7 +299,6 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         // ---- ciak con i tre selettori
         ClapperStripe(Modifier.padding(horizontal = 12.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).background(C.Panel)) {
-            Slot("FILM", FILMS[fi].name, open == 2, true, { open = if (open == 2) -1 else 2 }) { FilmGlyph(FILMS[fi].family, it) }
             Slot(
                 "LENTE", if (front) "FRONTALE" else (rl?.name ?: "—"), open == 1, false,
                 { if (!front && lenses.isNotEmpty()) open = if (open == 1) -1 else 1 },
@@ -340,13 +339,12 @@ fun CameraScreen(onAlbum: () -> Unit, onCams: () -> Unit = {}, lenses: List<Real
         } else {
             val panel = Modifier.fillMaxWidth().height(300.dp)
             when (open) {
-                1 -> LensList(
+                else -> LensList(
                     lenses, rl?.key,
                     { rl = it; prefs.realLens = it.key; open = -1 },
                     { Toast.makeText(ctx, "Lente non disponibile", Toast.LENGTH_SHORT).show() },
                     panel,
                 )
-                else -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
             }
         }
     }

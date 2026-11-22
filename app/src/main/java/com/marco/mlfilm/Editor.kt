@@ -260,7 +260,7 @@ fun EditorScreen(uri: Uri, onBack: () -> Unit, onSaved: () -> Unit) {
             when (open) {
                 0 -> GearGrid("CAMERA", CAMERAS.size, ci, 4, { ci = it }, { CAMERAS[it].name }, panel) { i, m -> CameraGlyph(CAMERAS[i].id, m) }
                 1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it }, { LENSES[it].name }, panel) { i, m -> LensGlyph(LENSES[i], m) }
-                2 -> FilmPicker(fi, { fi = it }, panel)
+                2 -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
                 4 -> Column(
                     panel.background(C.Panel).verticalScroll(rememberScrollState()).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
