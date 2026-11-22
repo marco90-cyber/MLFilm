@@ -50,7 +50,9 @@ fun describeCameras(ctx: Context): List<String> {
             val phys = if (Build.VERSION.SDK_INT >= 28) c.physicalCameraIds.toList() else emptyList()
             out += ""
             out += "ID $id · $facing" + if (logical) " · LOGICA" else ""
-            out += "  focale ${fl ?: "?"} mm$equiv$zoom$macro"
+            out += "  focale ${fl ?: "?"} mm$equiv"
+            if (zoom.isNotEmpty()) out += " $zoom"
+            if (macro.isNotEmpty()) out += " $macro"
             if (phys.isNotEmpty()) out += "  camere fisiche: ${phys.joinToString(", ")}"
             for (p in phys) {
                 try {
@@ -62,6 +64,26 @@ fun describeCameras(ctx: Context): List<String> {
                 } catch (_: Exception) {
                     out += "    - $p: non leggibile"
                 }
+            }
+        }
+        // prova ID nascosti (non nell'elenco ufficiale)
+        out += ""
+        out += "PROVA ID NASCOSTI 0-12:"
+        val listed = ids.toSet()
+        for (n in 0..12) {
+            val id = n.toString()
+            if (id in listed) continue
+            try {
+                val c = cm.getCameraCharacteristics(id)
+                val sz = c.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+                val fl = c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
+                val eq = if (sz != null && fl != null) " ~%.0f mm equiv.".format(fl * 43.27 / Math.sqrt((sz.width * sz.width + sz.height * sz.height).toDouble())) else ""
+                val face = c.get(CameraCharacteristics.LENS_FACING)
+                val mf = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+                out += "ID $id TROVATO · facing $face · focale ${fl ?: "?"} mm$eq"
+                if (mf != null) out += "   fuoco min ${"%.0f".format(100f / maxOf(mf, 0.01f))} cm"
+            } catch (e: Exception) {
+                out += "ID $id: no (${e.javaClass.simpleName})"
             }
         }
     } catch (e: Exception) {
