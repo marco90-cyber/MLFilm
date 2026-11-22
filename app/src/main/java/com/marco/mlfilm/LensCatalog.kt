@@ -1,0 +1,50 @@
+package com.marco.mlfilm
+
+// Generato da tools/make_lenses.py.
+// Distorsione, aberrazione cromatica e vignettatura: profili reali del database Lensfun (CC BY-SA 3.0, https://lensfun.github.io/).
+// Forma del bokeh, swirl, morbidezza e bagliore: stime nostre, non dati Lensfun.
+// Vedi anche NOTICE-LENSFUN.md.
+
+val LENSES: List<LensSpec> = listOf(
+    LensSpec("phone", "Smartphone", 1.0f, f = 0f, group = "BASE"),
+    LensSpec("ef85_12", "Canon EF 85mm f/1.2L II", 2.93f, f = 1.2f, focal = 85, group = "RITRATTO", real = true, dist = 0.008f, ca = 0f, vig = 0.35f, bloom = 0.1f),
+    LensSpec("nz85_12", "Nikkor Z 85mm f/1.2 S", 2.93f, f = 1.2f, focal = 85, group = "RITRATTO", real = true, dist = -0.024f, ca = 0.0001f, vig = 0.34f, bloom = 0.1f),
+    LensSpec("fuji56", "Fujifilm XF 56mm f/1.2", 1.93f, f = 1.2f, focal = 56, group = "RITRATTO", real = true, dist = 0.007f, ca = 0f, vig = 0.33f, bloom = 0.08f),
+    LensSpec("n85_18", "Nikkor AF-S 85mm f/1.8G", 2.93f, f = 1.8f, focal = 85, group = "RITRATTO", real = true, dist = -0.005f, ca = 0f, vig = 0.36f),
+    LensSpec("sf85", "Sony FE 85mm f/1.8", 2.93f, f = 1.8f, focal = 85, group = "RITRATTO", real = true, dist = 0.008f, ca = 0f, vig = 0.37f),
+    LensSpec("zeiss135", "Zeiss Sonnar 135mm f/1.8", 4.66f, f = 1.8f, focal = 135, group = "RITRATTO", real = true, dist = -0.005f, ca = 0f, vig = 0f, bloom = 0.05f),
+    LensSpec("ef50_18", "Canon EF 50mm f/1.8 STM", 1.72f, f = 1.8f, focal = 50, group = "STANDARD", real = true, dist = 0.032f, ca = 0f, vig = 0.39f),
+    LensSpec("ef50_14", "Canon EF 50mm f/1.4 USM", 1.72f, f = 1.4f, focal = 50, group = "STANDARD", real = true, dist = 0.027f, ca = 0.0002f, vig = 0.4f, bloom = 0.08f),
+    LensSpec("n50_14", "Nikkor AF-S 50mm f/1.4G", 1.72f, f = 1.4f, focal = 50, group = "STANDARD", real = true, dist = 0.028f, ca = 0.0003f, vig = 0.38f, bloom = 0.08f),
+    LensSpec("nz50", "Nikkor Z 50mm f/1.8 S", 1.72f, f = 1.8f, focal = 50, group = "STANDARD", real = true, dist = 0.013f, ca = 0f, vig = 0.37f),
+    LensSpec("sf50gm", "Sony FE 50mm f/1.4 GM", 1.72f, f = 1.4f, focal = 50, group = "STANDARD", real = true, dist = -0.026f, ca = 0.0001f, vig = 0f, bloom = 0.05f),
+    LensSpec("sf50_18", "Sony FE 50mm f/1.8", 1.72f, f = 1.8f, focal = 50, group = "STANDARD", real = true, dist = 0.005f, ca = 0.0001f, vig = 0.39f),
+    LensSpec("zeiss50", "Zeiss Planar T* 50mm f/1.4", 1.72f, f = 1.4f, focal = 50, group = "STANDARD", real = true, dist = 0.023f, ca = 0.0003f, vig = 0f, soft = 0.05f, bloom = 0.12f),
+    LensSpec("lei43", "Leica APO-Summicron 43mm f/2", 1.48f, f = 2f, focal = 43, group = "STANDARD", real = true, dist = 0.135f, ca = 0f, vig = 0f),
+    LensSpec("ef35_14", "Canon EF 35mm f/1.4L", 1.21f, f = 1.4f, focal = 35, group = "STANDARD", real = true, dist = 0.021f, ca = 0.0008f, vig = 0.39f, bloom = 0.08f),
+    LensSpec("s35a", "Sigma 35mm f/1.4 DG HSM Art", 1.21f, f = 1.4f, focal = 35, group = "STANDARD", real = true, dist = 0.005f, ca = 0.0001f, vig = 0.41f, bloom = 0.05f),
+    LensSpec("sf35gm", "Sony FE 35mm f/1.4 GM", 1.21f, f = 1.4f, focal = 35, group = "STANDARD", real = true, dist = -0.008f, ca = 0.0001f, vig = 0f, bloom = 0.05f),
+    LensSpec("n35_18", "Nikkor AF-S 35mm f/1.8G", 1.21f, f = 1.8f, focal = 35, group = "STANDARD", real = true, dist = 0.027f, ca = 0.0005f, vig = 0f),
+    LensSpec("zeiss35", "Zeiss Distagon 35mm f/2", 1.21f, f = 2f, focal = 35, group = "STANDARD", real = true, dist = 0.025f, ca = 0f, vig = 0.39f),
+    LensSpec("lei35", "Leica Summilux 35mm f/1.4", 1.21f, f = 1.4f, focal = 35, group = "STANDARD", real = true, dist = 0.017f, ca = 0.0001f, vig = 0f, bloom = 0.05f),
+    LensSpec("m43_25", "Leica DG Summilux 25mm f/1.4", 1.00f, f = 1.4f, focal = 25, group = "STANDARD", real = true, dist = 0.093f, ca = 0.0002f, vig = 0.3f, bloom = 0.05f),
+    LensSpec("sam14", "Samyang 14mm f/2.8", 1.00f, f = 2.8f, focal = 14, group = "GRANDANGOLO", real = true, dist = 0.055f, ca = 0.0001f, vig = 0.39f),
+    LensSpec("c1635", "Canon EF 16-35mm f/2.8L III", 1.00f, f = 2.8f, focal = 24, group = "ZOOM", real = true, dist = -0.01f, ca = 0.0001f, vig = 0.3f),
+    LensSpec("s1635gm", "Sony FE 16-35mm f/2.8 GM", 1.00f, f = 2.8f, focal = 24, group = "ZOOM", real = true, dist = -0.022f, ca = 0.0001f, vig = 0.33f),
+    LensSpec("z2470", "Canon EF 24-70mm f/2.8L II", 1.72f, f = 2.8f, focal = 50, group = "ZOOM", real = true, dist = -0.033f, ca = 0f, vig = 0.37f),
+    LensSpec("n2470", "Nikkor Z 24-70mm f/2.8 S", 1.72f, f = 2.8f, focal = 50, group = "ZOOM", real = true, dist = -0.043f, ca = 0.0001f, vig = 0.35f),
+    LensSpec("s2470gm", "Sony FE 24-70mm f/2.8 GM", 1.72f, f = 2.8f, focal = 50, group = "ZOOM", real = true, dist = -0.062f, ca = 0f, vig = 0.14f),
+    LensSpec("c70200", "Canon EF 70-200mm f/2.8L IS II", 4.66f, f = 2.8f, focal = 135, group = "ZOOM", real = true, dist = -0.01f, ca = 0f, vig = 0.32f),
+    LensSpec("n70200", "Nikkor AF-S 70-200mm f/2.8G VR II", 4.66f, f = 2.8f, focal = 135, group = "ZOOM", real = true, dist = -0.032f, ca = 0f, vig = 0.27f),
+    LensSpec("c100400", "Canon EF 100-400mm f/4.5-5.6L IS", 6.90f, f = 5.6f, focal = 200, group = "ZOOM", real = true, dist = -0.023f, ca = 0.0001f, vig = 0.2f),
+    LensSpec("ef100m", "Canon EF 100mm f/2.8L Macro", 3.45f, f = 2.8f, focal = 100, group = "MACRO", real = true, dist = -0.008f, ca = 0.0004f, vig = 0.28f),
+    LensSpec("takumar", "Pentax SMC Takumar 50mm f/1.4", 1.72f, f = 1.4f, focal = 50, group = "VINTAGE", real = true, dist = 0.016f, ca = 0.0006f, vig = 0.4f, shape = 1, swirl = 0.5f, soft = 0.25f, bloom = 0.35f),
+    LensSpec("sam8", "Samyang 8mm f/2.8 Fisheye", 1.00f, f = 2.8f, focal = 8, group = "GRANDANGOLO", real = true, dist = 0.95f, ca = 0f, vig = 0.42f),
+    LensSpec("c815", "Canon EF 8-15mm f/4L Fisheye", 1.00f, f = 4f, focal = 12, group = "GRANDANGOLO", real = true, dist = 0.9f, ca = 0.0001f, vig = 0.5f),
+    LensSpec("swirl", "Swirl 58mm f/1.4", 2.0f, f = 1.4f, focal = 58, group = "SPECIALI", swirl = 1f, vig = 0.24f, ca = 0.003f),
+    LensSpec("cat", "Occhio di gatto 50mm f/1.2", 1.7f, f = 1.2f, focal = 50, group = "SPECIALI", cat = 1f, vig = 0.25f, bloom = 0.1f),
+    LensSpec("soft", "Soft 90mm f/2.8", 3.1f, f = 2.8f, focal = 90, group = "SPECIALI", soft = 0.7f, bloom = 0.45f),
+    LensSpec("500", "Mirror 500mm f/8", 17f, f = 8f, focal = 500, group = "SPECIALI", shape = 7, vig = 0.26f, soft = 0.1f),
+    LensSpec("fish", "Fisheye 16mm f/8", 1.28f, f = 8f, focal = 16, group = "SPECIALI", dist = 0.95f, ca = 0.004f, vig = 0.15f),
+    LensSpec("tilt", "Tilt-Shift 45mm f/5.6", 1.35f, f = 5.6f, focal = 45, group = "SPECIALI", tilt = 1f),
+)

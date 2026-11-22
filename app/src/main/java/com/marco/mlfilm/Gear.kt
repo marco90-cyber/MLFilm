@@ -43,6 +43,9 @@ data class LensSpec(
     val dist: Float = 0f,
     val bloom: Float = 0f,
     val tilt: Float = 0f,
+    val focal: Int = 0,         // lunghezza focale in mm (0 = non indicata)
+    val group: String = "BASE", // categoria nell'elenco
+    val real: Boolean = false,  // distorsione/CA/vignettatura da profili Lensfun
 )
 
 val SHAPES = listOf("CERCHIO", "ESAGONO", "PENTAGONO", "CUORE", "STELLA", "OTTAGONO", "STELLA 6", "ANELLO", "GOCCIA", "SOFT", "FIORE", "TRIFOGLIO", "ROMBO", "QUADRATO")
@@ -181,22 +184,7 @@ val CAMERAS: List<CameraSpec> = listOf(
         con = 1.03f, sat = 1.02f, vig = 0.08f, grainMul = 0.6f),
 )
 
-// ---------------------------------------------------------------- obiettivi (vignettatura e aberrazione ispirate ai dati Lensfun)
-
-val LENSES: List<LensSpec> = listOf(
-    LensSpec("phone", "Smartphone", 1.0f, f = 0f),
-    LensSpec("24", "24mm f2.8", 1.0f, f = 2.8f, vig = 0.14f, ca = 0.002f, dist = 0.03f),
-    LensSpec("35", "35mm f2", 1.22f, f = 2f, vig = 0.29f),
-    LensSpec("50", "50mm f1.4", 1.7f, f = 1.4f, vig = 0.30f, bloom = 0.1f),
-    LensSpec("swirl", "Swirl 58 f1.4", 1.8f, f = 1.4f, swirl = 1f, vig = 0.24f, ca = 0.003f),
-    LensSpec("85", "85mm f1.4", 2.4f, f = 1.4f, vig = 0.30f, bloom = 0.08f),
-    LensSpec("135", "135mm f2", 3.2f, f = 2f, vig = 0.18f),
-    LensSpec("500", "Mirror 500 f8", 3.6f, f = 8f, shape = 7, vig = 0.26f, soft = 0.1f),
-    LensSpec("cat", "Occhio di gatto f1.2", 1.7f, f = 1.2f, cat = 1f, vig = 0.25f, bloom = 0.1f),
-    LensSpec("soft", "Soft 90 f2.8", 2.5f, f = 2.8f, soft = 0.7f, bloom = 0.45f),
-    LensSpec("fish", "Fisheye 16 f8", 1.28f, f = 8f, dist = 0.95f, ca = 0.004f, vig = 0.15f),
-    LensSpec("tilt", "Tilt-Shift f5.6", 1.35f, f = 5.6f, tilt = 1f),
-)
+// ---------------------------------------------------------------- obiettivi: vedi LensCatalog.kt (generato)
 
 private val FILM_SUFFIX = Regex(" (\\+\\+|\\+|\u2212)$")
 

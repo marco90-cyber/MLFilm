@@ -67,6 +67,26 @@ private fun displayName(uri: Uri): String? = uri.lastPathSegment?.substringBefor
 
 private fun fmtF(f: Float): String = if (f <= 0f) "OFF" else "F" + String.format(java.util.Locale.US, "%.1f", f)
 
+private fun cameraGroups(): List<Pair<String, List<Int>>> {
+    fun g(vararg ids: String) = ids.mapNotNull { id -> CAMERAS.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+    val used = g("phone", "rf", "tlr", "mf", "pano", "compact", "dispo", "instant", "toy", "pinhole", "box").toSet()
+    return listOf(
+        "BASE" to g("phone"),
+        "PROFESSIONALI" to g("rf", "tlr", "mf", "pano"),
+        "COMPATTE E ISTANTANEE" to g("compact", "dispo", "instant"),
+        "GIOCATTOLO E FAI-DA-TE" to g("toy", "pinhole", "box"),
+        "ALTRE" to CAMERAS.indices.filter { it !in used },
+    ).filter { it.second.isNotEmpty() }
+}
+
+private fun lensGroups(): List<Pair<String, List<Int>>> =
+    listOf("BASE", "RITRATTO", "STANDARD", "GRANDANGOLO", "ZOOM", "MACRO", "VINTAGE", "SPECIALI")
+        .map { gr -> gr to LENSES.indices.filter { LENSES[it].group == gr } }
+        .filter { it.second.isNotEmpty() }
+
+private fun lensSub(l: LensSpec): String =
+    if (l.focal == 0) "Nessuna lente" else "${l.focal}mm \u00b7 " + apertureLabel(l.f).replace("F", "f/") + if (l.real) " \u00b7 profilo Lensfun" else " \u00b7 stima"
+
 private fun lensAp(f: Float): Float = if (f <= 0f) 0f else f.coerceIn(1.4f, 16f)
 
 /** Fotografia di tutte le scelte, per annulla e ripeti. */
@@ -471,9 +491,14 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         if (open >= 0) {
             val panel = Modifier.fillMaxWidth().height(280.dp)
             when (open) {
-                0 -> GearGrid("CAMERA", CAMERAS.size, ci, 4, { ci = it }, { CAMERAS[it].name }, panel) { i, m -> CameraGlyph(CAMERAS[i].id, m) }
-                1 -> GearGrid("LENS", LENSES.size, li, 4, { li = it; ap = lensAp(LENSES[it].f); sh = LENSES[it].shape }, { LENSES[it].name }, panel) { i, m -> LensGlyph(LENSES[i], m) }
-                2 -> FilmPicker(fi, { fi = it; prefs.film = it }, panel)
+                0 -> GearList(
+                    "CAMERA", cameraGroups(), ci, { ci = it }, { CAMERAS[it].name }, { CAMERAS[it].tagline }, panel,
+                ) { i, m -> CameraGlyph(CAMERAS[i].id, m) }
+                1 -> GearList(
+                    "LENS", lensGroups(), li, { li = it; ap = lensAp(LENSES[it].f); sh = LENSES[it].shape },
+                    { LENSES[it].name }, { lensSub(LENSES[it]) }, panel,
+                ) { i, m -> LensGlyph(LENSES[i], m) }
+                2 -> FilmPicker(fi, { fi = it; prefs.film = it }, Modifier.fillMaxWidth().height(190.dp))
                 4 -> Column(
                     panel.background(C.Panel).verticalScroll(rememberScrollState()).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
