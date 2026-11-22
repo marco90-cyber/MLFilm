@@ -7,8 +7,8 @@ class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("roll", Context.MODE_PRIVATE)
 
     var film: Int
-        get() = sp.getInt("film2", 0)
-        set(v) { sp.edit().putInt("film2", v).apply() }
+        get() = sp.getInt("film3", 0)
+        set(v) { sp.edit().putInt("film3", v).apply() }
 
     /** Data arancione sulla foto salvata. */
     var date: Boolean

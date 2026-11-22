@@ -174,7 +174,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     LaunchedEffect(src, dq) {
         val s = src ?: return@LaunchedEffect
         depthStatus = "CALCOLO..."
-        val name = displayName(uri)?.let { if (dq == 1) it + "_x" else it }
+        val name = displayName(uri)?.let { if (dq == 1) it + "_x2" else it }
         val d = withContext(Dispatchers.Default) {
             name?.let { DepthStore.load(ctx, it) }
                 ?: DepthEstimator.estimate(s, dq == 1)?.also { b -> name?.let { n -> DepthStore.save(ctx, n, DepthStore.toPng(b)) } }
