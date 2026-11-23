@@ -129,6 +129,7 @@ data class Look(
     val shape: Int = 0,
     val swirl: Float = 0f,
     val cat: Float = 0f,
+    val focusW: Float = 0f,      // ampiezza della zona a fuoco (0 = solo il piano scelto .. 0.5 = molto profonda)
     val focusDepth: Float = 1f,  // profondità a fuoco (0 lontano .. 1 vicino)
     val fpU: Float = 0.5f,       // punto a fuoco nel fotogramma (origine in alto a sinistra)
     val fpV: Float = 0.5f,

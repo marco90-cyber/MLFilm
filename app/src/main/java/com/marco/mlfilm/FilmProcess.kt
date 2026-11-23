@@ -169,6 +169,7 @@ class FilmProcess {
             lut.bind(p, l.lut)
             p.f1("uBokeh", blurRadius(l.fNum))
             p.f1("uFocusD", l.focusDepth)
+            p.f1("uFocusW", l.focusW)
             p.f2("uFocusPt", l.fpU, 1f - l.fpV)
             p.f1("uShape", l.shape.toFloat())
             p.f1("uSwirl", l.swirl)

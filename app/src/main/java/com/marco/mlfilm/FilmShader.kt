@@ -49,6 +49,7 @@ uniform sampler2D uDepth;
 uniform float uDepthOn;
 uniform float uBokeh;
 uniform float uFocusD;
+uniform float uFocusW;
 uniform vec2 uFocusPt;
 uniform float uShape;
 uniform float uSwirl;
@@ -130,7 +131,7 @@ float shapeR(float a) {
 vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     float d0 = depthAt(c0, uv);
     float fk = 1.7 - 1.0 * uApod;
-    float coc0 = uBokeh * clamp(abs(d0 - uFocusD) * fk, 0.0, 1.0);
+    float coc0 = uBokeh * clamp(max(abs(d0 - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
     vec3 acc = col0;
     float wsum = 1.0;
     float jit = hash12(gl_FragCoord.xy + vec2(uSeed));
@@ -156,7 +157,7 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         vec2 suv = uv + p * uBokeh * vec2(1.0 / uOutAspect, 1.0);
         vec2 sc = toC(suv);
         float ds = depthAt(sc, suv);
-        float cocS = uBokeh * clamp(abs(ds - uFocusD) * fk, 0.0, 1.0);
+        float cocS = uBokeh * clamp(max(abs(ds - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
         float w;
         if (ds >= d0 - 0.03) {
             w = smoothstep(dist - 0.002, dist + 0.002, max(cocS, coc0));

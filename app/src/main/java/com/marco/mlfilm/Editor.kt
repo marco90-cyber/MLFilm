@@ -94,7 +94,7 @@ private data class Edit(
     val ci: Int, val li: Int, val fi: Int, val ap: Float, val sh: Int,
     val flare: Float, val star: Float, val sf: Float, val cs: Float, val apod: Float,
     val fd: Float, val fpU: Float, val fpV: Float, val hi: Float, val viv: Float, val snap: Int,
-    val adj: Adj = Adj(),
+    val adj: Adj = Adj(), val fw: Float = 0f,
 )
 
 private class History(val items: List<Edit>, val idx: Int)
@@ -120,6 +120,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var ap by remember { mutableFloatStateOf(lensAp(LENSES[0].f)) }
     var apDrag by remember { mutableStateOf(false) }
     var sh by remember { mutableIntStateOf(LENSES[0].shape) }
+    var fw by remember { mutableFloatStateOf(0f) } // ampiezza zona a fuoco
     var adj by remember { mutableStateOf(Adj()) }
     var adjTab by remember { mutableIntStateOf(0) }
     var flare by remember { mutableFloatStateOf(0f) }
@@ -143,7 +144,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var nextSnap by remember { mutableIntStateOf(1) }
     val snaps = remember { HashMap<Int, Bitmap>() }
 
-    fun editNow() = Edit(ci, li, fi, ap, sh, flare, star, sf, cs, apod, fd, fp.first, fp.second, hi, viv, snapId, adj)
+    fun editNow() = Edit(ci, li, fi, ap, sh, flare, star, sf, cs, apod, fd, fp.first, fp.second, hi, viv, snapId, adj, fw)
     var hist by remember { mutableStateOf(History(listOf(editNow()), 0)) }
     val cur = editNow()
     LaunchedEffect(cur) {
@@ -163,7 +164,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         val s = src
         val base = buildLook(CAMERAS[ci], LENSES[li], FILMS[fi])
         val l = base.copy(
-            fNum = ap, shape = sh, focusDepth = fd, fpU = fp.first, fpV = fp.second,
+            fNum = ap, shape = sh, focusDepth = fd, focusW = fw, fpU = fp.first, fpV = fp.second,
             flare = flare, star = star, apod = apod, hi = hi, viv = viv, adj = adj,
             soft = base.soft + sf * 0.9f, halation = base.halation + sf * 0.35f,
             shadow = Rgb(base.shadow.r - cs * 0.02f, base.shadow.g + cs * 0.015f, base.shadow.b + cs * 0.05f),
@@ -235,7 +236,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     fun applyEdit(e: Edit) {
         ci = e.ci; li = e.li; fi = e.fi; ap = e.ap; sh = e.sh
         flare = e.flare; star = e.star; sf = e.sf; cs = e.cs; apod = e.apod
-        fd = e.fd; fp = e.fpU to e.fpV; hi = e.hi; viv = e.viv; adj = e.adj
+        fd = e.fd; fp = e.fpU to e.fpV; hi = e.hi; viv = e.viv; adj = e.adj; fw = e.fw
         if (e.snap != snapId) snaps[e.snap]?.let { depth = it.copy(Bitmap.Config.ARGB_8888, true); depthVer++ }
         snapId = e.snap
     }
@@ -315,7 +316,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     val srcImg = remember(src) { src?.asImageBitmap() }
     // mirino "focus peaking": le zone a fuoco (profondità vicina a fd) si tingono d'ambra mentre si trascina la barra
     val peakOn = ap > 0f && !compare && open == 3 && tab == 4 && depth != null
-    val peak by produceState<ImageBitmap?>(null, depthVer, fd, peakOn) {
+    val peak by produceState<ImageBitmap?>(null, depthVer, fd, fw, peakOn) {
         val d = depth
         if (!peakOn || d == null) { value = null; return@produceState }
         value = withContext(Dispatchers.Default) {
@@ -326,7 +327,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
             sm.getPixels(px, 0, w, 0, 0, w, h)
             for (i in px.indices) {
                 val g = (px[i] and 0xFF) / 255f
-                val a = (1f - Math.abs(g - fd) / 0.1f).coerceIn(0f, 1f)
+                val a = (1f - Math.max(Math.abs(g - fd) - fw, 0f) / 0.1f).coerceIn(0f, 1f)
                 px[i] = ((a * 170f).toInt() shl 24) or 0xF5A623
             }
             val o = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
@@ -627,6 +628,8 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                             }
                             else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 FocusBar(fd, { fd = it })
+                                FxSlider("ZONA DI FUOCO", fw * 2f, 0f..1f) { fw = it * 0.5f }
+                                Mono("ZONA: STRETTA = SOLO UN PIANO NITIDO, LARGA = TANTA PROFONDITÀ A FUOCO", color = C.Dim, size = 9.sp)
                                 Mono("TRASCINA: LE ZONE AMBRA SULLA FOTO SONO A FUOCO", color = C.Dim, size = 9.sp)
                                 Mono("O TOCCA LA FOTO PER METTERE A FUOCO COME SU UNA REFLEX", color = C.Dim, size = 9.sp)
                             }
