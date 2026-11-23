@@ -6,7 +6,7 @@ e vedi l'effetto in anteprima; la foto finale viene salvata in `Pictures/MLFilm`
 - Schermata iniziale: **Scegli foto** (anche più foto di fila), oppure condividi una foto verso MLFilm / "Apri con"
 - Pellicole come LUT 3D (voce **Nessuna** per lasciare la foto com'è), grana, alone, light leak
 - Voce REGOLA: esposizione, contrasto, alte luci, ombre, bianchi, neri, temperatura, tinta, saturazione, vibranza, nitidezza, chiarezza, dehaze
-- 22 camere ispirate a modelli reali (digitali, reflex e compatte a pellicola, formati speciali, istantanee, economiche) più Smartphone senza effetto; i look sono stime nostre
+- 21 camere ispirate a modelli reali (digitali, reflex e compatte a pellicola, formati speciali, istantanee, economiche) più Smartphone senza effetto; i look sono stime nostre
   (Depth Anything V2 Small), forme bokeh, tocco per rifocalizzare, pennello profondità
 - Effetti: flare, starburst, soft focus, colore, fuoco sfuggente
 - Tieni premuto sulla foto per vedere l'originale; data arancione opzionale; salva o condividi
