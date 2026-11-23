@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,17 +25,22 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun Chip(text: String, on: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(6.dp)
-    Mono(
-        text,
-        color = if (on) C.Amber else C.Dim,
-        size = 10.sp,
-        modifier = Modifier
-            .background(Color(0x66000000), shape)
-            .border(1.dp, if (on) C.Amber else C.Line, shape)
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
+    val shape = RoundedCornerShape(8.dp)
+    // area di tocco alta almeno 48dp, anche se il bottoncino disegnato è più basso
+    Box(
+        Modifier.heightIn(min = 48.dp).clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Mono(
+            text,
+            color = if (on) C.Amber else C.Dim,
+            size = 11.sp,
+            modifier = Modifier
+                .background(Color(0x66000000), shape)
+                .border(1.dp, if (on) C.Amber else C.Line, shape)
+                .padding(horizontal = 14.dp, vertical = 9.dp),
+        )
+    }
 }
 
 @Composable
