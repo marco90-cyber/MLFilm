@@ -127,6 +127,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var fp by remember { mutableStateOf(0.5f to 0.5f) }
     var depth by remember { mutableStateOf<Bitmap?>(null) }
     var depthVer by remember { mutableIntStateOf(0) }
+    var smooth by remember { mutableFloatStateOf(0.5f) } // levigatura della mappa di profondità
     var depthStatus by remember { mutableStateOf("CALCOLO...") }
     var dq by remember { mutableIntStateOf(0) } // 0 Pro, 1 Extreme
     var showMap by remember { mutableStateOf(false) }
@@ -298,10 +299,18 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         Toast.makeText(ctx, "Apertura e fuoco regolati", Toast.LENGTH_SHORT).show()
     }
 
-    LaunchedEffect(src, look, depthVer) {
+    // mappa di profondità pulita (mediana + filtro bilaterale guidato dalla foto) usata per il rendering
+    val depthR by produceState<Bitmap?>(null, depth, depthVer, smooth, src) {
+        val d = depth
+        val s = src
+        if (d == null || s == null || smooth < 0.02f) { value = d; return@produceState }
+        delay(150)
+        value = withContext(Dispatchers.Default) { DepthFilter.smooth(d, s, smooth) }
+    }
+    LaunchedEffect(src, look, depthVer, depthR) {
         val s = src ?: return@LaunchedEffect
         val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-            proc.processLatest(s, look, 1280, if (look.fNum > 0f) depth else null) { if (cont.isActive) cont.resume(it) }
+            proc.processLatest(s, look, 1280, if (look.fNum > 0f) (depthR ?: depth) else null) { if (cont.isActive) cont.resume(it) }
         }
         if (out != null) preview = out.asImageBitmap()
     }
@@ -337,9 +346,10 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
         scope.launch {
             val saved = withContext(Dispatchers.IO) {
                 val full = PhotoIO.decode(ctx, uri, 4096) ?: return@withContext null
+                val dExp = depth?.let { dd -> if (smooth >= 0.02f) DepthFilter.smooth(dd, full, smooth) else dd }
                 val fullLook = look.copy(aspect = full.width.toFloat() / full.height)
                 val out = suspendCancellableCoroutine<Bitmap?> { cont ->
-                    proc.process(full, fullLook, 4096, if (fullLook.fNum > 0f) depth else null) { cont.resume(it) }
+                    proc.process(full, fullLook, 4096, if (fullLook.fNum > 0f) dExp else null) { cont.resume(it) }
                 }
                 full.recycle()
                 if (out == null) return@withContext null
@@ -587,6 +597,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                                     Chip("PENNELLO NITIDO", brush == 1) { brush = if (brush == 1) 0 else 1 }
                                     Chip("PENNELLO SFOCA", brush == 2) { brush = if (brush == 2) 0 else 2 }
                                 }
+                                FxSlider("LEVIGATURA", smooth, 0f..1f) { smooth = it }
                                 Mono("PROFONDITÀ: $depthStatus", color = C.Dim, size = 9.sp)
                                 Mono("COL PENNELLO DISEGNI SULLA FOTO PER CORREGGERE LA MAPPA", color = C.Dim, size = 9.sp)
                             }

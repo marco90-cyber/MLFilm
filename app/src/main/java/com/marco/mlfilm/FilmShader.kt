@@ -134,7 +134,7 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     float coc0 = uBokeh * clamp(max(abs(d0 - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
     vec3 acc = col0;
     float wsum = 1.0;
-    float jit = hash12(gl_FragCoord.xy + vec2(uSeed));
+    float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy + vec2(uSeed * 0.37), vec2(0.06711056, 0.00583715))));
     vec2 toCen = uv - 0.5;
     float cl = length(toCen);
     vec2 dir = cl > 0.0001 ? toCen / cl : vec2(1.0, 0.0);
