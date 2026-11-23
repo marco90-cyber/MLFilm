@@ -67,17 +67,10 @@ private fun displayName(uri: Uri): String? = uri.lastPathSegment?.substringBefor
 
 private fun fmtF(f: Float): String = if (f <= 0f) "OFF" else "F" + String.format(java.util.Locale.US, "%.1f", f)
 
-private fun cameraGroups(): List<Pair<String, List<Int>>> {
-    fun g(vararg ids: String) = ids.mapNotNull { id -> CAMERAS.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
-    val used = g("phone", "rf", "tlr", "mf", "pano", "compact", "dispo", "instant", "toy", "pinhole", "box").toSet()
-    return listOf(
-        "BASE" to g("phone"),
-        "PROFESSIONALI" to g("rf", "tlr", "mf", "pano"),
-        "COMPATTE E ISTANTANEE" to g("compact", "dispo", "instant"),
-        "GIOCATTOLO E FAI-DA-TE" to g("toy", "pinhole", "box"),
-        "ALTRE" to CAMERAS.indices.filter { it !in used },
-    ).filter { it.second.isNotEmpty() }
-}
+private fun cameraGroups(): List<Pair<String, List<Int>>> =
+    listOf("BASE", "DIGITALI", "PELLICOLA: REFLEX E COMPATTE", "ISTANTANEE", "FORMATI SPECIALI", "GIOCATTOLO E FAI-DA-TE", "ALTRE")
+        .map { gr -> gr to CAMERAS.indices.filter { CAMERAS[it].group == gr } }
+        .filter { it.second.isNotEmpty() }
 
 private fun lensGroups(): List<Pair<String, List<Int>>> =
     listOf("BASE", "RITRATTO", "STANDARD", "GRANDANGOLO", "ZOOM", "MACRO", "VINTAGE", "SPECIALI")
