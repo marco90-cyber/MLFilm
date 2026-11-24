@@ -138,6 +138,22 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     vec2 toCen = uv - 0.5;
     float cl = length(toCen);
     vec2 dir = cl > 0.0001 ? toCen / cl : vec2(1.0, 0.0);
+    // raggio utile locale (come il "tile max CoC" dei DoF dei motori): quanto lontano arriva davvero la sfocatura
+    // di un oggetto vicino fino a questo pixel. I campioni si concentrano li' invece che su tutto il raggio massimo,
+    // cosi' il bordo della sfocatura in primo piano e' liscio e senza puntinatura.
+    float rMax = coc0;
+    for (int k = 0; k < 20; k++) {
+        float pa = float(k) * 2.39996323 + jit * 6.2831853;
+        float prr = sqrt((float(k) + 0.5) / 20.0);
+        vec2 puv = uv + prr * vec2(cos(pa), sin(pa)) * uBokeh * vec2(1.0 / uOutAspect, 1.0);
+        float dp = depthAt(toC(puv), puv);
+        float cp = uBokeh * clamp(max(abs(dp - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
+        float dr = prr * uBokeh;
+        if (cp >= dr * 0.8 && dp >= d0 - 0.03) rMax = max(rMax, dr + uBokeh * 0.12);
+    }
+    rMax = min(rMax, uBokeh);
+    if (rMax < 0.0006) return col0;
+    float edgeW = 0.0025 + 0.05 * rMax;
     for (int i = 0; i < 96; i++) {
         if (float(i) >= uTaps) break;
         float fi = float(i) + jit;
@@ -153,16 +169,16 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         if (uCat > 0.0) {
             p -= dir * dot(p, dir) * (uCat * clamp(cl * 1.5, 0.0, 0.75));
         }
-        float dist = r * uBokeh;
-        vec2 suv = uv + p * uBokeh * vec2(1.0 / uOutAspect, 1.0);
+        float dist = r * rMax;
+        vec2 suv = uv + p * rMax * vec2(1.0 / uOutAspect, 1.0);
         vec2 sc = toC(suv);
         float ds = depthAt(sc, suv);
         float cocS = uBokeh * clamp(max(abs(ds - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
         float w;
         if (ds >= d0 - 0.03) {
-            w = smoothstep(dist - 0.002, dist + 0.002, max(cocS, coc0));
+            w = smoothstep(dist - edgeW, dist + edgeW, max(cocS, coc0));
         } else {
-            w = smoothstep(dist - 0.002, dist + 0.002, coc0);
+            w = smoothstep(dist - edgeW, dist + edgeW, coc0);
         }
         if (w <= 0.0) continue;
         vec3 sc3 = fetchC(sc);
