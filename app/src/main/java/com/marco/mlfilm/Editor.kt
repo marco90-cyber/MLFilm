@@ -131,7 +131,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
     var depthVer by remember { mutableIntStateOf(0) }
     var smooth by remember { mutableFloatStateOf(0.5f) } // levigatura della mappa di profondità
     var depthStatus by remember { mutableStateOf("CALCOLO...") }
-    var dq by remember(uri) { mutableIntStateOf(0) } // 0 Pro, 1 Extreme
+    var dq by remember(uri) { mutableIntStateOf(1) } // 0 Pro, 1 Extreme (parte da solo Extreme)
     var showMap by remember { mutableStateOf(false) }
     var brush by remember { mutableIntStateOf(0) } // 0 spento, 1 nitido, 2 sfocato
     var reticle by remember { mutableStateOf(false) }
