@@ -154,7 +154,7 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     rMax = min(rMax, uBokeh);
     if (rMax < 0.0006) return col0;
     float edgeW = 0.0025 + 0.05 * rMax;
-    for (int i = 0; i < 96; i++) {
+    for (int i = 0; i < 128; i++) {
         if (float(i) >= uTaps) break;
         float fi = float(i) + jit;
         float r = sqrt((fi + 0.5) / uTaps);
@@ -179,6 +179,8 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
             w = smoothstep(dist - edgeW, dist + edgeW, max(cocS, coc0));
         } else {
             w = smoothstep(dist - edgeW, dist + edgeW, coc0);
+            // il pixel e' in primo piano e il campione sta dietro: lo sfondo nitido non deve trasparire (fantasmi)
+            if (d0 > uFocusD + uFocusW) w *= 0.55;
         }
         if (w <= 0.0) continue;
         vec3 sc3 = fetchC(sc);
