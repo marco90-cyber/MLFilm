@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,17 +29,17 @@ fun Chip(text: String, on: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     // area di tocco alta almeno 48dp, anche se il bottoncino disegnato è più basso
     Box(
-        Modifier.heightIn(min = 48.dp).clickable { onClick() },
+        Modifier.heightIn(min = 56.dp).widthIn(min = 56.dp).clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Mono(
             text,
             color = if (on) C.Amber else C.Dim,
-            size = 11.sp,
+            size = 13.sp,
             modifier = Modifier
                 .background(Color(0x66000000), shape)
                 .border(1.dp, if (on) C.Amber else C.Line, shape)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
+                .padding(horizontal = 18.dp, vertical = 13.dp),
         )
     }
 }

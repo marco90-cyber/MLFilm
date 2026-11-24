@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -479,23 +481,23 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clickable(enabled = canUndo) { undo() }, contentAlignment = Alignment.Center) {
-                    UndoGlyph(false, canUndo, Modifier.size(26.dp))
+                Box(Modifier.size(52.dp).clickable(enabled = canUndo) { undo() }, contentAlignment = Alignment.Center) {
+                    UndoGlyph(false, canUndo, Modifier.size(32.dp))
                 }
-                Box(Modifier.size(40.dp).clickable(enabled = canRedo) { redo() }, contentAlignment = Alignment.Center) {
-                    UndoGlyph(true, canRedo, Modifier.size(26.dp))
+                Box(Modifier.size(52.dp).clickable(enabled = canRedo) { redo() }, contentAlignment = Alignment.Center) {
+                    UndoGlyph(true, canRedo, Modifier.size(32.dp))
                 }
             }
             Box(
                 Modifier
                     .background(C.Amber, RoundedCornerShape(8.dp))
                     .clickable { magic() }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
             ) {
                 Mono("MAGIC ENHANCE", color = Color.Black, size = 11.sp, weight = FontWeight.Bold)
             }
             Box(
-                Modifier.size(40.dp).pointerInput(Unit) {
+                Modifier.size(52.dp).pointerInput(Unit) {
                     detectTapGestures(onPress = {
                         compare = true
                         tryAwaitRelease()
@@ -504,7 +506,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
                 },
                 contentAlignment = Alignment.Center,
             ) {
-                CompareGlyph(compare, Modifier.size(26.dp))
+                CompareGlyph(compare, Modifier.size(32.dp))
             }
         }
 
@@ -518,7 +520,7 @@ fun EditorScreen(uri: Uri, counter: String?, onBack: () -> Unit, onSaved: () -> 
             Slot("REGOLA", if (adj.on) "ON" else "OFF", open == 5, false, { open = if (open == 5) -1 else 5 }) { AdjustGlyph(adj.on, it) }
         }
         if (open >= 0) {
-            val panel = Modifier.fillMaxWidth().height(280.dp)
+            val panel = Modifier.fillMaxWidth().height(300.dp)
             when (open) {
                 0 -> GearList(
                     "CAMERA", cameraGroups(), ci, { ci = it }, { CAMERAS[it].name }, { CAMERAS[it].tagline }, panel,
@@ -659,7 +661,7 @@ private fun DepthButton(text: String, on: Boolean, modifier: Modifier, onClick: 
         modifier
             .background(if (on) C.Amber else Color(0xFF262626), RoundedCornerShape(10.dp))
             .clickable { onClick() }
-            .padding(vertical = 16.dp),
+            .padding(vertical = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
         Mono(text, color = if (on) Color.Black else C.Dim, size = 13.sp, weight = FontWeight.Bold)
@@ -684,7 +686,7 @@ private fun FxSlider(label: String, value: Float, range: ClosedFloatingPointRang
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Mono(
             if (value != 0f) "$label \u00d7" else label, color = if (value != 0f) C.Amber else C.Text, size = 10.sp,
-            modifier = Modifier.width(110.dp).clickable { onChange(0f) },
+            modifier = Modifier.width(110.dp).heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).clickable { onChange(0f) },
         )
         Slider(
             value = value,
