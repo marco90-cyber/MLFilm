@@ -43,7 +43,8 @@ object DepthFilter {
         }
 
         // 2) bilaterale congiunto guidato dalla luminosità della foto
-        val r = ((1f + strength * 5f) * (w / 518f)).roundToInt().coerceAtLeast(1)
+        // su mappe più grandi (Extreme, 1036) il raggio cresce solo con la radice, per non cancellare il dettaglio in più
+        val r = ((1f + strength * 5f) * Math.sqrt((w / 518f).toDouble()).toFloat()).roundToInt().coerceAtLeast(1)
         val stride = maxOf(1, r / 4)
         val sSpace = r * 0.55f + 0.5f
         val inv2s = 1f / (2f * sSpace * sSpace)

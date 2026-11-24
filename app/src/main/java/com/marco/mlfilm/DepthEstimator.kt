@@ -83,9 +83,9 @@ object DepthEstimator {
 
     /**
      * Un solo calcolo alla volta (l'Interpreter non è thread-safe). Chiamare fuori dal thread principale e da quello GL.
-     * Pro: una passata (518x518). Extreme: media con la foto specchiata più 4 riquadri sovrapposti (60% della foto, ognuno
-     * rianalizzato a 518x518), riallineati alla mappa globale e fusi in una mappa 1036x1036 con molto più dettaglio sui bordi.
-     * Costa circa 6 passate del modello.
+     * Pro: una passata (518x518). Extreme: media con la foto specchiata più 9 riquadri sovrapposti (griglia 3x3, 50% della foto, ognuno
+     * rianalizzato a 518x518, quindi a doppia risoluzione), riallineati alla mappa globale e fusi in una mappa 1036x1036 con molto più dettaglio sui bordi.
+     * Costa circa 11 passate del modello.
      */
     @Synchronized
     fun estimate(src: Bitmap, extreme: Boolean = false): Bitmap? {
@@ -108,14 +108,14 @@ object DepthEstimator {
             val wsum = FloatArray(big * big)
             for (Y in 0 until big) for (X in 0 until big) {
                 val i = Y * big + X
-                acc[i] = 0.25f * bil(g, s, (X + 0.5f) / big * s - 0.5f, (Y + 0.5f) / big * s - 0.5f)
-                wsum[i] = 0.25f
+                acc[i] = 0.15f * bil(g, s, (X + 0.5f) / big * s - 0.5f, (Y + 0.5f) / big * s - 0.5f)
+                wsum[i] = 0.15f
             }
-            val cw = (src.width * 0.6f).toInt().coerceAtLeast(16)
-            val ch = (src.height * 0.6f).toInt().coerceAtLeast(16)
-            for (ty in 0..1) for (tx in 0..1) {
-                val cx = if (tx == 0) 0 else src.width - cw
-                val cy = if (ty == 0) 0 else src.height - ch
+            val cw = (src.width * 0.5f).toInt().coerceAtLeast(16)
+            val ch = (src.height * 0.5f).toInt().coerceAtLeast(16)
+            for (ty in 0..2) for (tx in 0..2) {
+                val cx = tx * (src.width - cw) / 2
+                val cy = ty * (src.height - ch) / 2
                 val crop = Bitmap.createBitmap(src, cx, cy, cw, ch)
                 val t = runModel(it, crop, s)
                 crop.recycle()
