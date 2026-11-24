@@ -132,13 +132,13 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
     float d0 = depthAt(c0, uv);
     float fk = 1.7 - 1.0 * uApod;
     float coc0 = uBokeh * clamp(max(abs(d0 - uFocusD) - uFocusW, 0.0) * fk, 0.0, 1.0);
-    vec3 acc = col0;
+    vec3 acc = col0 * col0;   // somma in luce lineare (gamma ~2): le luci sfocate brillano invece di ingrigire
     float wsum = 1.0;
     float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy + vec2(uSeed * 0.37), vec2(0.06711056, 0.00583715))));
     vec2 toCen = uv - 0.5;
     float cl = length(toCen);
     vec2 dir = cl > 0.0001 ? toCen / cl : vec2(1.0, 0.0);
-    for (int i = 0; i < 48; i++) {
+    for (int i = 0; i < 96; i++) {
         if (float(i) >= uTaps) break;
         float fi = float(i) + jit;
         float r = sqrt((fi + 0.5) / uTaps);
@@ -168,15 +168,15 @@ vec3 bokehBlur(vec2 uv, vec2 c0, vec3 col0) {
         vec3 sc3 = fetchC(sc);
         float lum = dot(sc3, vec3(0.299, 0.587, 0.114));
         sc3 = clamp(mix(vec3(lum), sc3, 1.0 + uBokViv * 1.5), 0.0, 1.0);
-        w *= 1.0 + uBoost * smoothstep(0.72, 1.0, lum) * 6.0;
-        w *= 1.0 + uBokHi * smoothstep(0.55, 1.0, lum) * 10.0;
+        w *= 1.0 + uBoost * smoothstep(0.72, 1.0, lum) * 4.0;
+        w *= 1.0 + uBokHi * smoothstep(0.55, 1.0, lum) * 7.0;
         if (uShape > 6.5 && uShape < 7.5) w *= 0.15 + smoothstep(0.45, 0.72, r);
         if (uShape > 8.5 && uShape < 9.5) w *= exp(-2.5 * r * r);
         w *= 1.0 - uApod * 0.9 * r * r;
-        acc += sc3 * w;
+        acc += sc3 * sc3 * w;
         wsum += w;
     }
-    return acc / wsum;
+    return sqrt(acc / wsum);
 }
 
 // LUT 3D 13x13x13 impaginata in una striscia 169x13 (fetta = blu, x = rosso, y = verde).

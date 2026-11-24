@@ -89,7 +89,7 @@ class FilmProcess {
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             }
             val heavy = l.fNum > 0f
-            applyLook(p, lutTex, l, if (heavy) 48f else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
+            applyLook(p, lutTex, l, if (heavy) (if (ow.toLong() * oh > 1_500_000L) 96f else 64f) else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
             if (heavy && ow.toLong() * oh > 3_000_000L) {
                 // a fasce, per non far scattare il watchdog della GPU
                 GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
