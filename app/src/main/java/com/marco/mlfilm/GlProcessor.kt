@@ -20,11 +20,11 @@ class GlProcessor {
     private val proc = FilmProcess()
 
     /** [cb] viene chiamata sul thread del processore; la bitmap sorgente non viene riciclata. */
-    fun process(src: Bitmap, look: Look, maxSide: Int, depth: Bitmap? = null, cb: (Bitmap?) -> Unit) {
+    fun process(src: Bitmap, look: Look, maxSide: Int, depth: Bitmap? = null, mask: Bitmap? = null, cb: (Bitmap?) -> Unit) {
         handler.post {
             val out = try {
                 if (!ready) init()
-                if (ready) proc.process(src, look, maxSide, depth) else null
+                if (ready) proc.process(src, look, maxSide, depth, mask) else null
             } catch (e: Throwable) {
                 null
             }
@@ -32,20 +32,20 @@ class GlProcessor {
         }
     }
 
-    private class Job(val src: Bitmap, val look: Look, val maxSide: Int, val depth: Bitmap?, val cb: (Bitmap?) -> Unit)
+    private class Job(val src: Bitmap, val look: Look, val maxSide: Int, val depth: Bitmap?, val mask: Bitmap?, val cb: (Bitmap?) -> Unit)
     private val pending = java.util.concurrent.atomic.AtomicReference<Job?>(null)
 
     /**
      * Per l'anteprima mentre si trascina uno slider: se arrivano più richieste mentre la GPU è occupata, resta solo l'ultima
      * (le precedenti non chiamano [cb]). Così l'immagine segue il dito senza accumulare lavoro.
      */
-    fun processLatest(src: Bitmap, look: Look, maxSide: Int, depth: Bitmap? = null, cb: (Bitmap?) -> Unit) {
-        val prev = pending.getAndSet(Job(src, look, maxSide, depth, cb))
+    fun processLatest(src: Bitmap, look: Look, maxSide: Int, depth: Bitmap? = null, mask: Bitmap? = null, cb: (Bitmap?) -> Unit) {
+        val prev = pending.getAndSet(Job(src, look, maxSide, depth, mask, cb))
         if (prev == null) handler.post {
             val j = pending.getAndSet(null) ?: return@post
             val out = try {
                 if (!ready) init()
-                if (ready) proc.process(j.src, j.look, j.maxSide, j.depth) else null
+                if (ready) proc.process(j.src, j.look, j.maxSide, j.depth, j.mask) else null
             } catch (e: Throwable) {
                 null
             }

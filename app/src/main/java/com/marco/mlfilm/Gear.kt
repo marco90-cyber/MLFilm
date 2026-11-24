@@ -38,6 +38,13 @@ data class Adj(
     val on: Boolean get() = this != Adj()
 }
 
+/** Regolazioni locali: si applicano solo dentro la maschera (MASCHERE). */
+data class LocalAdj(
+    val exp: Float = 0f, val con: Float = 0f, val hi: Float = 0f, val sh: Float = 0f, val temp: Float = 0f, val sat: Float = 0f,
+) {
+    val on: Boolean get() = this != LocalAdj()
+}
+
 /** Obiettivo: lunghezza focale, apertura di default e forma del bokeh (la sfocatura usa la profondità). */
 data class LensSpec(
     val id: String,
@@ -140,6 +147,8 @@ data class Look(
     val viv: Float = 0f,         // colore delle luci sfocate (bokeh), 0..1
     val apod: Float = 0f,        // bokeh morbido e passaggio di fuoco graduale ("fuoco sfuggente")
     val adj: Adj = Adj(),        // regolazioni manuali (REGOLA)
+    val local: LocalAdj = LocalAdj(), // regolazioni dentro la maschera
+    val maskShow: Boolean = false,    // mostra la maschera in rosso
 )
 
 fun buildLook(cam: CameraSpec, lens: LensSpec, film: FilmSpec) = Look(

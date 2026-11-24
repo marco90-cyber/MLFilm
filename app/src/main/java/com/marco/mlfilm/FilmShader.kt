@@ -217,6 +217,26 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+uniform sampler2D uMask;
+uniform float uMaskOn;
+uniform float uMaskShow;
+uniform float uLExp, uLCon, uLHi, uLSh, uLTemp, uLSat;
+
+// regolazioni locali: stessa logica di REGOLA ma ridotta alle voci principali
+vec3 localCol(vec3 col) {
+    col *= exp2(uLExp * 1.5);
+    col.r *= 1.0 + uLTemp * 0.25;
+    col.b *= 1.0 - uLTemp * 0.25;
+    col = max(col, vec3(0.0));
+    float l = clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    col *= 1.0 + uLSh * 0.6 * (1.0 - l) * (1.0 - l);
+    col *= 1.0 + uLHi * 0.4 * l * l;
+    col = (col - 0.5) * (1.0 + uLCon * 0.8) + 0.5;
+    float l2 = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(l2), col, max(0.0, 1.0 + uLSat));
+    return max(col, vec3(0.0));
+}
+
 uniform float uAdjOn;
 uniform float uAExp, uACon, uAHi, uASh, uAWh, uABl, uATemp, uATint, uASat, uAVib, uASharp, uAClar, uAHaze;
 
@@ -320,6 +340,11 @@ void main() {
 
     col *= uGain * exp2(uBri);
     if (uAdjOn > 0.5) col = adjustCol(col, c);
+    float mk = 0.0;
+    if (uMaskOn > 0.5) {
+        mk = texture2D(uMask, srcUv(c)).r;
+        if (mk > 0.002) col = mix(col, localCol(col), mk);
+    }
     if (uLutOn > 0.5) col = lutFetch(col);
     col = (col - 0.5) * uCon + 0.5;
     float l = dot(col, vec3(0.299, 0.587, 0.114));
@@ -346,6 +371,7 @@ void main() {
         col += k * vec3(1.0, 0.42, 0.12);
     }
 
+    if (uMaskShow > 0.5) col = mix(col, vec3(0.95, 0.15, 0.15), mk * 0.55);
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 """

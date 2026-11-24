@@ -27,7 +27,7 @@ class FilmProcess {
         lutTex.reset()
     }
 
-    fun process(input: Bitmap, l: Look, maxSide: Int, depth: Bitmap? = null): Bitmap? {
+    fun process(input: Bitmap, l: Look, maxSide: Int, depth: Bitmap? = null, mask: Bitmap? = null): Bitmap? {
         val maxTex = IntArray(1)
         GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTex, 0)
         val limit = minOf(maxTex[0], maxSide)
@@ -56,8 +56,8 @@ class FilmProcess {
         oh = maxOf(oh, 2)
 
         val p = prog ?: GlProgram(FilmShader.FRAGMENT_2D).also { prog = it }
-        val ids = IntArray(3) // 0 = texture foto, 1 = texture destinazione, 2 = profondità
-        GLES20.glGenTextures(3, ids, 0)
+        val ids = IntArray(4) // 0 = texture foto, 1 = texture destinazione, 2 = profondità, 3 = maschera
+        GLES20.glGenTextures(4, ids, 0)
         val fbo = IntArray(1)
         GLES20.glGenFramebuffers(1, fbo, 0)
         try {
@@ -88,8 +88,19 @@ class FilmProcess {
                 GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, depth, 0)
                 GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             }
+            val useMask = mask != null && (l.local.on || l.maskShow)
+            if (useMask) {
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE3)
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[3])
+                setupTex()
+                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, mask, 0)
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            }
             val heavy = l.fNum > 0f
             applyLook(p, lutTex, l, if (heavy) (if (ow.toLong() * oh > 1_500_000L) 128f else 80f) else 0f, useDepth, sa, ow.toFloat() / oh, 1f, 0f, -1f, rnd.nextFloat() * 100f)
+            p.f1("uMaskOn", if (useMask) 1f else 0f)
+            p.f1("uMaskShow", if (l.maskShow) 1f else 0f)
+            p.i1("uMask", 3)
             if (heavy && ow.toLong() * oh > 3_000_000L) {
                 // a fasce, per non far scattare il watchdog della GPU
                 GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
@@ -115,7 +126,7 @@ class FilmProcess {
         } finally {
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
             GLES20.glDeleteFramebuffers(1, fbo, 0)
-            GLES20.glDeleteTextures(3, ids, 0)
+            GLES20.glDeleteTextures(4, ids, 0)
             if (src !== input) src.recycle()
         }
     }
@@ -188,6 +199,8 @@ class FilmProcess {
             p.f1("uASat", a.sat); p.f1("uAVib", a.vib); p.f1("uASharp", a.sharp); p.f1("uAClar", a.clar); p.f1("uAHaze", a.haze)
             p.f1("uDepthOn", if (depthOn) 1f else 0f)
             p.i1("uDepth", 2)
+            val lc = l.local
+            p.f1("uLExp", lc.exp); p.f1("uLCon", lc.con); p.f1("uLHi", lc.hi); p.f1("uLSh", lc.sh); p.f1("uLTemp", lc.temp); p.f1("uLSat", lc.sat)
         }
     }
 }
